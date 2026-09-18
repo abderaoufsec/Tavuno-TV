@@ -1,4 +1,8 @@
 :80 {
+    handle_path /api/* {
+        reverse_proxy tavuno-control:8000
+    }
+
     handle_path /directus/* {
         reverse_proxy directus:8055
     }

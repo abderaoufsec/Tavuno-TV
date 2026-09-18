@@ -252,6 +252,8 @@ services:
     depends_on:
       directus:
         condition: service_started
+      tavuno-control:
+        condition: service_started
 
     volumes:
       - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
@@ -260,6 +262,49 @@ services:
 
     networks:
       - tavuno-public
+      - tavuno-internal
+
+
+  tavuno-control:
+    build:
+      context: ../tavuno-control
+    container_name: tavuno-control
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:${TAVUNO_API_PORT:-8000}:8000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    environment:
+      TAVUNO_ENV: ${TAVUNO_ENV:-development}
+      TAVUNO_LOG_LEVEL: ${TAVUNO_LOG_LEVEL:-INFO}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
       - tavuno-internal
 
 
