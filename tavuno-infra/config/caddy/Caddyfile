@@ -1,0 +1,7 @@
+:80 {
+    handle_path /directus/* {
+        reverse_proxy directus:8055
+    }
+
+    respond / "Tavuno TV M1 reverse proxy is running" 200
+}

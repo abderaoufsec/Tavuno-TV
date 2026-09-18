@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+
+<Server version="8">
+
+    <Name>OvenMediaEngine</Name>
+
+    <Type>origin</Type>
+
+    <IP>*</IP>
+
+    <PrivacyProtection>false</PrivacyProtection>
+
+    <Modules>
+
+        <HTTP2>
+            <Enable>true</Enable>
+        </HTTP2>
+
+        <LLHLS>
+            <Enable>true</Enable>
+        </LLHLS>
+
+    </Modules>
+
+    <Bind>
+
+        <Managers>
+
+            <API>
+                <Port>8081</Port>
+                <WorkerCount>1</WorkerCount>
+            </API>
+
+        </Managers>
+
+    </Bind>
+
+    <Managers>
+
+        <Host>
+            <Names>
+                <Name>*</Name>
+            </Names>
+        </Host>
+
+        <API>
+            <AccessToken>tavuno-m1-local</AccessToken>
+        </API>
+
+    </Managers>
+
+</Server>
