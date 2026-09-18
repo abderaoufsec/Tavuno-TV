@@ -1,0 +1,4610 @@
+version: 1
+directus: 12.3.1
+vendor: postgres
+collections:
+  - collection: tavuno_audit_logs
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_audit_logs
+      color: null
+      display_template: '{{event_type}}'
+      group: null
+      hidden: false
+      icon: history
+      item_duplication_fields: null
+      note: Application-level security and operator audit trail.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_audit_logs
+  - collection: tavuno_categories
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_categories
+      color: null
+      display_template: '{{name}}'
+      group: null
+      hidden: false
+      icon: category
+      item_duplication_fields: null
+      note: Catalog categories.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_categories
+  - collection: tavuno_channel_sources
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_channel_sources
+      color: null
+      display_template: '{{external_id}}'
+      group: null
+      hidden: false
+      icon: link
+      item_duplication_fields: null
+      note: Dispatcharr-backed channel-source mappings.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_channel_sources
+  - collection: tavuno_channels
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_channels
+      color: null
+      display_template: '{{name}}'
+      group: null
+      hidden: false
+      icon: live_tv
+      item_duplication_fields: null
+      note: Tavuno live-TV catalog.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_channels
+  - collection: tavuno_devices
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_devices
+      color: null
+      display_template: '{{name}}'
+      group: null
+      hidden: false
+      icon: tv
+      item_duplication_fields: null
+      note: Registered playback devices.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_devices
+  - collection: tavuno_entitlements
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_entitlements
+      color: null
+      display_template: '{{id}}'
+      group: null
+      hidden: false
+      icon: verified_user
+      item_duplication_fields: null
+      note: Explicit content and package grants.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_entitlements
+  - collection: tavuno_epg_channels
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_epg_channels
+      color: null
+      display_template: '{{external_id}}'
+      group: null
+      hidden: false
+      icon: calendar_month
+      item_duplication_fields: null
+      note: EPG identities mapped to Tavuno channels.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_epg_channels
+  - collection: tavuno_epg_programmes
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_epg_programmes
+      color: null
+      display_template: '{{title}}'
+      group: null
+      hidden: false
+      icon: event_note
+      item_duplication_fields: null
+      note: Normalized EPG programmes.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_epg_programmes
+  - collection: tavuno_episodes
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_episodes
+      color: null
+      display_template: '{{title}}'
+      group: null
+      hidden: false
+      icon: slideshow
+      item_duplication_fields: null
+      note: Series episodes.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_episodes
+  - collection: tavuno_movies
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_movies
+      color: null
+      display_template: '{{title}}'
+      group: null
+      hidden: false
+      icon: movie
+      item_duplication_fields: null
+      note: VOD movie metadata.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_movies
+  - collection: tavuno_plans
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_plans
+      color: null
+      display_template: '{{name}}'
+      group: null
+      hidden: false
+      icon: workspace_premium
+      item_duplication_fields: null
+      note: Subscription plans available to Tavuno profiles.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_plans
+  - collection: tavuno_playback_sessions
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_playback_sessions
+      color: null
+      display_template: '{{id}}'
+      group: null
+      hidden: false
+      icon: play_circle
+      item_duplication_fields: null
+      note: Short-lived authorized playback sessions.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_playback_sessions
+  - collection: tavuno_profiles
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_profiles
+      color: null
+      display_template: '{{display_name}}'
+      group: null
+      hidden: false
+      icon: person
+      item_duplication_fields: null
+      note: Customer-facing profile attached to a Directus user.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_profiles
+  - collection: tavuno_seasons
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_seasons
+      color: null
+      display_template: '{{title}}'
+      group: null
+      hidden: false
+      icon: view_week
+      item_duplication_fields: null
+      note: Series seasons.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_seasons
+  - collection: tavuno_series
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_series
+      color: null
+      display_template: '{{title}}'
+      group: null
+      hidden: false
+      icon: theaters
+      item_duplication_fields: null
+      note: Series metadata.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_series
+  - collection: tavuno_subscriptions
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      autosave_revision_interval: null
+      collapse: open
+      collection: tavuno_subscriptions
+      color: null
+      display_template: '{{id}}'
+      group: null
+      hidden: false
+      icon: card_membership
+      item_duplication_fields: null
+      note: Plan assignments and validity windows.
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      status: active
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: tavuno_subscriptions
+fields:
+  - collection: tavuno_audit_logs
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_audit_logs
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_audit_logs
+      data_type: integer
+      default_value: nextval('tavuno_audit_logs_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_audit_logs
+    field: actor
+    type: uuid
+    meta:
+      collection: tavuno_audit_logs
+      conditions: null
+      display: null
+      display_options: null
+      field: actor
+      group: null
+      hidden: false
+      interface: input
+      note: Directus user that initiated the event, if known.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: actor
+      table: tavuno_audit_logs
+      data_type: uuid
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: directus_users
+      foreign_key_column: id
+  - collection: tavuno_audit_logs
+    field: event_type
+    type: string
+    meta:
+      collection: tavuno_audit_logs
+      conditions: null
+      display: null
+      display_options: null
+      field: event_type
+      group: null
+      hidden: false
+      interface: input
+      note: Machine-readable event name.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: event_type
+      table: tavuno_audit_logs
+      data_type: character varying
+      default_value: null
+      max_length: 120
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_audit_logs
+    field: subject_type
+    type: string
+    meta:
+      collection: tavuno_audit_logs
+      conditions: null
+      display: null
+      display_options: null
+      field: subject_type
+      group: null
+      hidden: false
+      interface: input
+      note: Type of affected resource.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: subject_type
+      table: tavuno_audit_logs
+      data_type: character varying
+      default_value: null
+      max_length: 64
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_audit_logs
+    field: subject_key
+    type: string
+    meta:
+      collection: tavuno_audit_logs
+      conditions: null
+      display: null
+      display_options: null
+      field: subject_key
+      group: null
+      hidden: false
+      interface: input
+      note: Affected resource identifier.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: subject_key
+      table: tavuno_audit_logs
+      data_type: character varying
+      default_value: null
+      max_length: 128
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_audit_logs
+    field: metadata
+    type: json
+    meta:
+      collection: tavuno_audit_logs
+      conditions: null
+      display: null
+      display_options: null
+      field: metadata
+      group: null
+      hidden: false
+      interface: input-code
+      note: Non-secret structured event context.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 6
+      special:
+        - cast-json
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: metadata
+      table: tavuno_audit_logs
+      data_type: json
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_audit_logs
+    field: occurred_at
+    type: timestamp
+    meta:
+      collection: tavuno_audit_logs
+      conditions: null
+      display: null
+      display_options: null
+      field: occurred_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: Event timestamp.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 7
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: occurred_at
+      table: tavuno_audit_logs
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_categories
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_categories
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_categories
+      data_type: integer
+      default_value: nextval('tavuno_categories_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_categories
+    field: name
+    type: string
+    meta:
+      collection: tavuno_categories
+      conditions: null
+      display: null
+      display_options: null
+      field: name
+      group: null
+      hidden: false
+      interface: input
+      note: Category title.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: name
+      table: tavuno_categories
+      data_type: character varying
+      default_value: null
+      max_length: 120
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_categories
+    field: kind
+    type: string
+    meta:
+      collection: tavuno_categories
+      conditions: null
+      display: null
+      display_options: null
+      field: kind
+      group: null
+      hidden: false
+      interface: input
+      note: live, movie, series, or sports.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: kind
+      table: tavuno_categories
+      data_type: character varying
+      default_value: null
+      max_length: 32
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_categories
+    field: parent
+    type: integer
+    meta:
+      collection: tavuno_categories
+      conditions: null
+      display: null
+      display_options: null
+      field: parent
+      group: null
+      hidden: false
+      interface: input
+      note: Optional parent category.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: parent
+      table: tavuno_categories
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_categories
+      foreign_key_column: id
+  - collection: tavuno_categories
+    field: sort_order
+    type: integer
+    meta:
+      collection: tavuno_categories
+      conditions: null
+      display: null
+      display_options: null
+      field: sort_order
+      group: null
+      hidden: false
+      interface: input
+      note: Catalog sort order.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: sort_order
+      table: tavuno_categories
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_categories
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_categories
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether the category is published.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_categories
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channel_sources
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_channel_sources
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_channel_sources
+      data_type: integer
+      default_value: nextval('tavuno_channel_sources_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channel_sources
+    field: channel
+    type: integer
+    meta:
+      collection: tavuno_channel_sources
+      conditions: null
+      display: null
+      display_options: null
+      field: channel
+      group: null
+      hidden: false
+      interface: input
+      note: Parent Tavuno channel.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: channel
+      table: tavuno_channel_sources
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_channels
+      foreign_key_column: id
+  - collection: tavuno_channel_sources
+    field: provider
+    type: string
+    meta:
+      collection: tavuno_channel_sources
+      conditions: null
+      display: null
+      display_options: null
+      field: provider
+      group: null
+      hidden: false
+      interface: input
+      note: Source system; Dispatcharr for M2.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: provider
+      table: tavuno_channel_sources
+      data_type: character varying
+      default_value: null
+      max_length: 64
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channel_sources
+    field: external_id
+    type: string
+    meta:
+      collection: tavuno_channel_sources
+      conditions: null
+      display: null
+      display_options: null
+      field: external_id
+      group: null
+      hidden: false
+      interface: input
+      note: Source-system identifier.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: external_id
+      table: tavuno_channel_sources
+      data_type: character varying
+      default_value: null
+      max_length: 128
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channel_sources
+    field: priority
+    type: integer
+    meta:
+      collection: tavuno_channel_sources
+      conditions: null
+      display: null
+      display_options: null
+      field: priority
+      group: null
+      hidden: false
+      interface: input
+      note: Failover priority.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: priority
+      table: tavuno_channel_sources
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channel_sources
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_channel_sources
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether the mapping is eligible.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_channel_sources
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channels
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_channels
+      data_type: integer
+      default_value: nextval('tavuno_channels_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channels
+    field: name
+    type: string
+    meta:
+      collection: tavuno_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: name
+      group: null
+      hidden: false
+      interface: input
+      note: Channel display name.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: name
+      table: tavuno_channels
+      data_type: character varying
+      default_value: null
+      max_length: 160
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channels
+    field: slug
+    type: string
+    meta:
+      collection: tavuno_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: slug
+      group: null
+      hidden: false
+      interface: input
+      note: Stable client-facing channel key.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: slug
+      table: tavuno_channels
+      data_type: character varying
+      default_value: null
+      max_length: 160
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_channels
+    field: category
+    type: integer
+    meta:
+      collection: tavuno_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: category
+      group: null
+      hidden: false
+      interface: input
+      note: Primary catalog category.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: category
+      table: tavuno_channels
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_categories
+      foreign_key_column: id
+  - collection: tavuno_channels
+    field: logo
+    type: uuid
+    meta:
+      collection: tavuno_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: logo
+      group: null
+      hidden: false
+      interface: input
+      note: Optional Directus File channel logo.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: logo
+      table: tavuno_channels
+      data_type: uuid
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: directus_files
+      foreign_key_column: id
+  - collection: tavuno_channels
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether the channel is available.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_channels
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_devices
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_devices
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_devices
+      data_type: integer
+      default_value: nextval('tavuno_devices_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_devices
+    field: profile
+    type: integer
+    meta:
+      collection: tavuno_devices
+      conditions: null
+      display: null
+      display_options: null
+      field: profile
+      group: null
+      hidden: false
+      interface: input
+      note: Owning Tavuno profile.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: profile
+      table: tavuno_devices
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_profiles
+      foreign_key_column: id
+  - collection: tavuno_devices
+    field: name
+    type: string
+    meta:
+      collection: tavuno_devices
+      conditions: null
+      display: null
+      display_options: null
+      field: name
+      group: null
+      hidden: false
+      interface: input
+      note: Human-readable device name.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: name
+      table: tavuno_devices
+      data_type: character varying
+      default_value: null
+      max_length: 120
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_devices
+    field: device_key
+    type: string
+    meta:
+      collection: tavuno_devices
+      conditions: null
+      display: null
+      display_options: null
+      field: device_key
+      group: null
+      hidden: false
+      interface: input
+      note: Stable, non-secret device identifier.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: device_key
+      table: tavuno_devices
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_devices
+    field: platform
+    type: string
+    meta:
+      collection: tavuno_devices
+      conditions: null
+      display: null
+      display_options: null
+      field: platform
+      group: null
+      hidden: false
+      interface: input
+      note: Client platform, such as android_tv.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: platform
+      table: tavuno_devices
+      data_type: character varying
+      default_value: null
+      max_length: 48
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_devices
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_devices
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether this device may start playback.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_devices
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_devices
+    field: last_seen_at
+    type: timestamp
+    meta:
+      collection: tavuno_devices
+      conditions: null
+      display: null
+      display_options: null
+      field: last_seen_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: Last authenticated activity.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 7
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: last_seen_at
+      table: tavuno_devices
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_entitlements
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_entitlements
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_entitlements
+      data_type: integer
+      default_value: nextval('tavuno_entitlements_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_entitlements
+    field: subscription
+    type: integer
+    meta:
+      collection: tavuno_entitlements
+      conditions: null
+      display: null
+      display_options: null
+      field: subscription
+      group: null
+      hidden: false
+      interface: input
+      note: Granting subscription.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: subscription
+      table: tavuno_entitlements
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_subscriptions
+      foreign_key_column: id
+  - collection: tavuno_entitlements
+    field: resource_type
+    type: string
+    meta:
+      collection: tavuno_entitlements
+      conditions: null
+      display: null
+      display_options: null
+      field: resource_type
+      group: null
+      hidden: false
+      interface: input
+      note: channel, category, movie, series, or package.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: resource_type
+      table: tavuno_entitlements
+      data_type: character varying
+      default_value: null
+      max_length: 32
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_entitlements
+    field: resource_key
+    type: string
+    meta:
+      collection: tavuno_entitlements
+      conditions: null
+      display: null
+      display_options: null
+      field: resource_key
+      group: null
+      hidden: false
+      interface: input
+      note: Stable resource identifier within the resource type.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: resource_key
+      table: tavuno_entitlements
+      data_type: character varying
+      default_value: null
+      max_length: 128
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_entitlements
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_entitlements
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether the entitlement is effective.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_entitlements
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_epg_channels
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_epg_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_epg_channels
+      data_type: integer
+      default_value: nextval('tavuno_epg_channels_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_epg_channels
+    field: channel
+    type: integer
+    meta:
+      collection: tavuno_epg_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: channel
+      group: null
+      hidden: false
+      interface: input
+      note: Mapped Tavuno channel.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: channel
+      table: tavuno_epg_channels
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_channels
+      foreign_key_column: id
+  - collection: tavuno_epg_channels
+    field: external_id
+    type: string
+    meta:
+      collection: tavuno_epg_channels
+      conditions: null
+      display: null
+      display_options: null
+      field: external_id
+      group: null
+      hidden: false
+      interface: input
+      note: XMLTV or provider channel identifier.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: external_id
+      table: tavuno_epg_channels
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_epg_programmes
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_epg_programmes
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_epg_programmes
+      data_type: integer
+      default_value: nextval('tavuno_epg_programmes_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_epg_programmes
+    field: epg_channel
+    type: integer
+    meta:
+      collection: tavuno_epg_programmes
+      conditions: null
+      display: null
+      display_options: null
+      field: epg_channel
+      group: null
+      hidden: false
+      interface: input
+      note: Mapped EPG channel.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: epg_channel
+      table: tavuno_epg_programmes
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_epg_channels
+      foreign_key_column: id
+  - collection: tavuno_epg_programmes
+    field: title
+    type: string
+    meta:
+      collection: tavuno_epg_programmes
+      conditions: null
+      display: null
+      display_options: null
+      field: title
+      group: null
+      hidden: false
+      interface: input
+      note: Programme title.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: title
+      table: tavuno_epg_programmes
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_epg_programmes
+    field: starts_at
+    type: timestamp
+    meta:
+      collection: tavuno_epg_programmes
+      conditions: null
+      display: null
+      display_options: null
+      field: starts_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: Programme start.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: starts_at
+      table: tavuno_epg_programmes
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_epg_programmes
+    field: ends_at
+    type: timestamp
+    meta:
+      collection: tavuno_epg_programmes
+      conditions: null
+      display: null
+      display_options: null
+      field: ends_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: Programme end.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: ends_at
+      table: tavuno_epg_programmes
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_epg_programmes
+    field: description
+    type: text
+    meta:
+      collection: tavuno_epg_programmes
+      conditions: null
+      display: null
+      display_options: null
+      field: description
+      group: null
+      hidden: false
+      interface: input-multiline
+      note: Programme synopsis.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: description
+      table: tavuno_epg_programmes
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_episodes
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_episodes
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_episodes
+      data_type: integer
+      default_value: nextval('tavuno_episodes_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_episodes
+    field: season
+    type: integer
+    meta:
+      collection: tavuno_episodes
+      conditions: null
+      display: null
+      display_options: null
+      field: season
+      group: null
+      hidden: false
+      interface: input
+      note: Parent season.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: season
+      table: tavuno_episodes
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_seasons
+      foreign_key_column: id
+  - collection: tavuno_episodes
+    field: episode_number
+    type: integer
+    meta:
+      collection: tavuno_episodes
+      conditions: null
+      display: null
+      display_options: null
+      field: episode_number
+      group: null
+      hidden: false
+      interface: input
+      note: One-based episode number.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: episode_number
+      table: tavuno_episodes
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_episodes
+    field: title
+    type: string
+    meta:
+      collection: tavuno_episodes
+      conditions: null
+      display: null
+      display_options: null
+      field: title
+      group: null
+      hidden: false
+      interface: input
+      note: Episode title.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: title
+      table: tavuno_episodes
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_episodes
+    field: synopsis
+    type: text
+    meta:
+      collection: tavuno_episodes
+      conditions: null
+      display: null
+      display_options: null
+      field: synopsis
+      group: null
+      hidden: false
+      interface: input-multiline
+      note: Episode synopsis.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: synopsis
+      table: tavuno_episodes
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_episodes
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_episodes
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether the episode is published.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_episodes
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_movies
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_movies
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_movies
+      data_type: integer
+      default_value: nextval('tavuno_movies_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_movies
+    field: title
+    type: string
+    meta:
+      collection: tavuno_movies
+      conditions: null
+      display: null
+      display_options: null
+      field: title
+      group: null
+      hidden: false
+      interface: input
+      note: Movie title.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: title
+      table: tavuno_movies
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_movies
+    field: slug
+    type: string
+    meta:
+      collection: tavuno_movies
+      conditions: null
+      display: null
+      display_options: null
+      field: slug
+      group: null
+      hidden: false
+      interface: input
+      note: Stable client-facing movie key.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: slug
+      table: tavuno_movies
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_movies
+    field: category
+    type: integer
+    meta:
+      collection: tavuno_movies
+      conditions: null
+      display: null
+      display_options: null
+      field: category
+      group: null
+      hidden: false
+      interface: input
+      note: Primary movie category.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: category
+      table: tavuno_movies
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_categories
+      foreign_key_column: id
+  - collection: tavuno_movies
+    field: synopsis
+    type: text
+    meta:
+      collection: tavuno_movies
+      conditions: null
+      display: null
+      display_options: null
+      field: synopsis
+      group: null
+      hidden: false
+      interface: input-multiline
+      note: Movie synopsis.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: synopsis
+      table: tavuno_movies
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_movies
+    field: release_year
+    type: integer
+    meta:
+      collection: tavuno_movies
+      conditions: null
+      display: null
+      display_options: null
+      field: release_year
+      group: null
+      hidden: false
+      interface: input
+      note: Release year.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: release_year
+      table: tavuno_movies
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_movies
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_movies
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether the movie is published.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 7
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_movies
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_plans
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_plans
+      data_type: integer
+      default_value: nextval('tavuno_plans_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_plans
+    field: name
+    type: string
+    meta:
+      collection: tavuno_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: name
+      group: null
+      hidden: false
+      interface: input
+      note: Operator-facing plan name.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: name
+      table: tavuno_plans
+      data_type: character varying
+      default_value: null
+      max_length: 120
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_plans
+    field: code
+    type: string
+    meta:
+      collection: tavuno_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: code
+      group: null
+      hidden: false
+      interface: input
+      note: Stable internal plan code.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: code
+      table: tavuno_plans
+      data_type: character varying
+      default_value: null
+      max_length: 64
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_plans
+    field: description
+    type: text
+    meta:
+      collection: tavuno_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: description
+      group: null
+      hidden: false
+      interface: input-multiline
+      note: Operator-facing plan description.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: description
+      table: tavuno_plans
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_plans
+    field: max_devices
+    type: integer
+    meta:
+      collection: tavuno_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: max_devices
+      group: null
+      hidden: false
+      interface: input
+      note: Maximum registered devices.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: max_devices
+      table: tavuno_plans
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_plans
+    field: max_concurrent_streams
+    type: integer
+    meta:
+      collection: tavuno_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: max_concurrent_streams
+      group: null
+      hidden: false
+      interface: input
+      note: Maximum simultaneous playback sessions.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: max_concurrent_streams
+      table: tavuno_plans
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_plans
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether the plan can be sold or assigned.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 7
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_plans
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_playback_sessions
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_playback_sessions
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_playback_sessions
+      data_type: integer
+      default_value: nextval('tavuno_playback_sessions_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_playback_sessions
+    field: profile
+    type: integer
+    meta:
+      collection: tavuno_playback_sessions
+      conditions: null
+      display: null
+      display_options: null
+      field: profile
+      group: null
+      hidden: false
+      interface: input
+      note: Profile initiating playback.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: profile
+      table: tavuno_playback_sessions
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_profiles
+      foreign_key_column: id
+  - collection: tavuno_playback_sessions
+    field: device
+    type: integer
+    meta:
+      collection: tavuno_playback_sessions
+      conditions: null
+      display: null
+      display_options: null
+      field: device
+      group: null
+      hidden: false
+      interface: input
+      note: Device initiating playback.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: device
+      table: tavuno_playback_sessions
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_devices
+      foreign_key_column: id
+  - collection: tavuno_playback_sessions
+    field: content_type
+    type: string
+    meta:
+      collection: tavuno_playback_sessions
+      conditions: null
+      display: null
+      display_options: null
+      field: content_type
+      group: null
+      hidden: false
+      interface: input
+      note: channel, movie, or episode.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: content_type
+      table: tavuno_playback_sessions
+      data_type: character varying
+      default_value: null
+      max_length: 32
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_playback_sessions
+    field: content_key
+    type: string
+    meta:
+      collection: tavuno_playback_sessions
+      conditions: null
+      display: null
+      display_options: null
+      field: content_key
+      group: null
+      hidden: false
+      interface: input
+      note: Stable content key.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: content_key
+      table: tavuno_playback_sessions
+      data_type: character varying
+      default_value: null
+      max_length: 128
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_playback_sessions
+    field: status
+    type: string
+    meta:
+      collection: tavuno_playback_sessions
+      conditions: null
+      display: null
+      display_options: null
+      field: status
+      group: null
+      hidden: false
+      interface: input
+      note: created, playing, closed, or expired.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: status
+      table: tavuno_playback_sessions
+      data_type: character varying
+      default_value: null
+      max_length: 32
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_playback_sessions
+    field: expires_at
+    type: timestamp
+    meta:
+      collection: tavuno_playback_sessions
+      conditions: null
+      display: null
+      display_options: null
+      field: expires_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: Authorization expiry.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 7
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: expires_at
+      table: tavuno_playback_sessions
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_playback_sessions
+    field: last_seen_at
+    type: timestamp
+    meta:
+      collection: tavuno_playback_sessions
+      conditions: null
+      display: null
+      display_options: null
+      field: last_seen_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: Last client heartbeat.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 8
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: last_seen_at
+      table: tavuno_playback_sessions
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_profiles
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_profiles
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_profiles
+      data_type: integer
+      default_value: nextval('tavuno_profiles_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_profiles
+    field: directus_user
+    type: uuid
+    meta:
+      collection: tavuno_profiles
+      conditions: null
+      display: null
+      display_options: null
+      field: directus_user
+      group: null
+      hidden: false
+      interface: input
+      note: The authenticated Directus account that owns this profile.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: directus_user
+      table: tavuno_profiles
+      data_type: uuid
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: directus_users
+      foreign_key_column: id
+  - collection: tavuno_profiles
+    field: display_name
+    type: string
+    meta:
+      collection: tavuno_profiles
+      conditions: null
+      display: null
+      display_options: null
+      field: display_name
+      group: null
+      hidden: false
+      interface: input
+      note: Profile name shown in Tavuno clients.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: display_name
+      table: tavuno_profiles
+      data_type: character varying
+      default_value: null
+      max_length: 120
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_profiles
+    field: status
+    type: string
+    meta:
+      collection: tavuno_profiles
+      conditions: null
+      display: null
+      display_options: null
+      field: status
+      group: null
+      hidden: false
+      interface: input
+      note: active, suspended, or deleted.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: status
+      table: tavuno_profiles
+      data_type: character varying
+      default_value: null
+      max_length: 32
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_seasons
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_seasons
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_seasons
+      data_type: integer
+      default_value: nextval('tavuno_seasons_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_seasons
+    field: series
+    type: integer
+    meta:
+      collection: tavuno_seasons
+      conditions: null
+      display: null
+      display_options: null
+      field: series
+      group: null
+      hidden: false
+      interface: input
+      note: Parent series.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: series
+      table: tavuno_seasons
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_series
+      foreign_key_column: id
+  - collection: tavuno_seasons
+    field: season_number
+    type: integer
+    meta:
+      collection: tavuno_seasons
+      conditions: null
+      display: null
+      display_options: null
+      field: season_number
+      group: null
+      hidden: false
+      interface: input
+      note: One-based season number.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: season_number
+      table: tavuno_seasons
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_seasons
+    field: title
+    type: string
+    meta:
+      collection: tavuno_seasons
+      conditions: null
+      display: null
+      display_options: null
+      field: title
+      group: null
+      hidden: false
+      interface: input
+      note: Season title.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: title
+      table: tavuno_seasons
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_series
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_series
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_series
+      data_type: integer
+      default_value: nextval('tavuno_series_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_series
+    field: title
+    type: string
+    meta:
+      collection: tavuno_series
+      conditions: null
+      display: null
+      display_options: null
+      field: title
+      group: null
+      hidden: false
+      interface: input
+      note: Series title.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: title
+      table: tavuno_series
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_series
+    field: slug
+    type: string
+    meta:
+      collection: tavuno_series
+      conditions: null
+      display: null
+      display_options: null
+      field: slug
+      group: null
+      hidden: false
+      interface: input
+      note: Stable client-facing series key.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: slug
+      table: tavuno_series
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_series
+    field: category
+    type: integer
+    meta:
+      collection: tavuno_series
+      conditions: null
+      display: null
+      display_options: null
+      field: category
+      group: null
+      hidden: false
+      interface: input
+      note: Primary series category.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: category
+      table: tavuno_series
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_categories
+      foreign_key_column: id
+  - collection: tavuno_series
+    field: synopsis
+    type: text
+    meta:
+      collection: tavuno_series
+      conditions: null
+      display: null
+      display_options: null
+      field: synopsis
+      group: null
+      hidden: false
+      interface: input-multiline
+      note: Series synopsis.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: synopsis
+      table: tavuno_series
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_series
+    field: is_active
+    type: boolean
+    meta:
+      collection: tavuno_series
+      conditions: null
+      display: null
+      display_options: null
+      field: is_active
+      group: null
+      hidden: false
+      interface: boolean
+      note: Whether the series is published.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: is_active
+      table: tavuno_series
+      data_type: boolean
+      default_value: true
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_subscriptions
+    field: id
+    type: integer
+    meta:
+      collection: tavuno_subscriptions
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: numeric
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: tavuno_subscriptions
+      data_type: integer
+      default_value: nextval('tavuno_subscriptions_id_seq'::regclass)
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: true
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_subscriptions
+    field: profile
+    type: integer
+    meta:
+      collection: tavuno_subscriptions
+      conditions: null
+      display: null
+      display_options: null
+      field: profile
+      group: null
+      hidden: false
+      interface: input
+      note: Subscribed profile.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 2
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: profile
+      table: tavuno_subscriptions
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_profiles
+      foreign_key_column: id
+  - collection: tavuno_subscriptions
+    field: plan
+    type: integer
+    meta:
+      collection: tavuno_subscriptions
+      conditions: null
+      display: null
+      display_options: null
+      field: plan
+      group: null
+      hidden: false
+      interface: input
+      note: Assigned plan.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 3
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: plan
+      table: tavuno_subscriptions
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: tavuno_plans
+      foreign_key_column: id
+  - collection: tavuno_subscriptions
+    field: status
+    type: string
+    meta:
+      collection: tavuno_subscriptions
+      conditions: null
+      display: null
+      display_options: null
+      field: status
+      group: null
+      hidden: false
+      interface: input
+      note: pending, active, cancelled, or expired.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: status
+      table: tavuno_subscriptions
+      data_type: character varying
+      default_value: null
+      max_length: 32
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_subscriptions
+    field: starts_at
+    type: timestamp
+    meta:
+      collection: tavuno_subscriptions
+      conditions: null
+      display: null
+      display_options: null
+      field: starts_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: Subscription start.
+      options: null
+      readonly: false
+      required: true
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: starts_at
+      table: tavuno_subscriptions
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: tavuno_subscriptions
+    field: ends_at
+    type: timestamp
+    meta:
+      collection: tavuno_subscriptions
+      conditions: null
+      display: null
+      display_options: null
+      field: ends_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: Subscription expiry, if any.
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: ends_at
+      table: tavuno_subscriptions
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+systemFields:
+  - collection: directus_activity
+    field: timestamp
+    schema:
+      is_indexed: true
+  - collection: directus_oauth_clients
+    field: date_created
+    schema:
+      is_indexed: true
+  - collection: directus_oauth_codes
+    field: expires_at
+    schema:
+      is_indexed: true
+  - collection: directus_oauth_codes
+    field: used_at
+    schema:
+      is_indexed: true
+  - collection: directus_oauth_consents
+    field: client
+    schema:
+      is_indexed: true
+  - collection: directus_oauth_tokens
+    field: code_hash
+    schema:
+      is_indexed: true
+  - collection: directus_oauth_tokens
+    field: expires_at
+    schema:
+      is_indexed: true
+  - collection: directus_oauth_tokens
+    field: previous_session
+    schema:
+      is_indexed: true
+  - collection: directus_oauth_tokens
+    field: session
+    schema:
+      is_indexed: true
+  - collection: directus_revisions
+    field: activity
+    schema:
+      is_indexed: true
+  - collection: directus_revisions
+    field: parent
+    schema:
+      is_indexed: true
+  - collection: directus_sessions
+    field: oauth_client
+    schema:
+      is_indexed: true
+relations:
+  - collection: tavuno_audit_logs
+    field: actor
+    related_collection: directus_users
+    meta:
+      junction_field: null
+      many_collection: tavuno_audit_logs
+      many_field: actor
+      one_allowed_collections: null
+      one_collection: directus_users
+      one_collection_field: null
+      one_deselect_action: nullify
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_audit_logs
+      column: actor
+      foreign_key_table: directus_users
+      foreign_key_column: id
+      constraint_name: tavuno_audit_logs_actor_foreign
+      on_update: NO ACTION
+      on_delete: SET NULL
+  - collection: tavuno_categories
+    field: parent
+    related_collection: tavuno_categories
+    meta:
+      junction_field: null
+      many_collection: tavuno_categories
+      many_field: parent
+      one_allowed_collections: null
+      one_collection: tavuno_categories
+      one_collection_field: null
+      one_deselect_action: nullify
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_categories
+      column: parent
+      foreign_key_table: tavuno_categories
+      foreign_key_column: id
+      constraint_name: tavuno_categories_parent_foreign
+      on_update: NO ACTION
+      on_delete: SET NULL
+  - collection: tavuno_channel_sources
+    field: channel
+    related_collection: tavuno_channels
+    meta:
+      junction_field: null
+      many_collection: tavuno_channel_sources
+      many_field: channel
+      one_allowed_collections: null
+      one_collection: tavuno_channels
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_channel_sources
+      column: channel
+      foreign_key_table: tavuno_channels
+      foreign_key_column: id
+      constraint_name: tavuno_channel_sources_channel_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_channels
+    field: category
+    related_collection: tavuno_categories
+    meta:
+      junction_field: null
+      many_collection: tavuno_channels
+      many_field: category
+      one_allowed_collections: null
+      one_collection: tavuno_categories
+      one_collection_field: null
+      one_deselect_action: nullify
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_channels
+      column: category
+      foreign_key_table: tavuno_categories
+      foreign_key_column: id
+      constraint_name: tavuno_channels_category_foreign
+      on_update: NO ACTION
+      on_delete: SET NULL
+  - collection: tavuno_channels
+    field: logo
+    related_collection: directus_files
+    meta:
+      junction_field: null
+      many_collection: tavuno_channels
+      many_field: logo
+      one_allowed_collections: null
+      one_collection: directus_files
+      one_collection_field: null
+      one_deselect_action: nullify
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_channels
+      column: logo
+      foreign_key_table: directus_files
+      foreign_key_column: id
+      constraint_name: tavuno_channels_logo_foreign
+      on_update: NO ACTION
+      on_delete: SET NULL
+  - collection: tavuno_devices
+    field: profile
+    related_collection: tavuno_profiles
+    meta:
+      junction_field: null
+      many_collection: tavuno_devices
+      many_field: profile
+      one_allowed_collections: null
+      one_collection: tavuno_profiles
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_devices
+      column: profile
+      foreign_key_table: tavuno_profiles
+      foreign_key_column: id
+      constraint_name: tavuno_devices_profile_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_entitlements
+    field: subscription
+    related_collection: tavuno_subscriptions
+    meta:
+      junction_field: null
+      many_collection: tavuno_entitlements
+      many_field: subscription
+      one_allowed_collections: null
+      one_collection: tavuno_subscriptions
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_entitlements
+      column: subscription
+      foreign_key_table: tavuno_subscriptions
+      foreign_key_column: id
+      constraint_name: tavuno_entitlements_subscription_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_epg_channels
+    field: channel
+    related_collection: tavuno_channels
+    meta:
+      junction_field: null
+      many_collection: tavuno_epg_channels
+      many_field: channel
+      one_allowed_collections: null
+      one_collection: tavuno_channels
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_epg_channels
+      column: channel
+      foreign_key_table: tavuno_channels
+      foreign_key_column: id
+      constraint_name: tavuno_epg_channels_channel_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_epg_programmes
+    field: epg_channel
+    related_collection: tavuno_epg_channels
+    meta:
+      junction_field: null
+      many_collection: tavuno_epg_programmes
+      many_field: epg_channel
+      one_allowed_collections: null
+      one_collection: tavuno_epg_channels
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_epg_programmes
+      column: epg_channel
+      foreign_key_table: tavuno_epg_channels
+      foreign_key_column: id
+      constraint_name: tavuno_epg_programmes_epg_channel_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_episodes
+    field: season
+    related_collection: tavuno_seasons
+    meta:
+      junction_field: null
+      many_collection: tavuno_episodes
+      many_field: season
+      one_allowed_collections: null
+      one_collection: tavuno_seasons
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_episodes
+      column: season
+      foreign_key_table: tavuno_seasons
+      foreign_key_column: id
+      constraint_name: tavuno_episodes_season_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_movies
+    field: category
+    related_collection: tavuno_categories
+    meta:
+      junction_field: null
+      many_collection: tavuno_movies
+      many_field: category
+      one_allowed_collections: null
+      one_collection: tavuno_categories
+      one_collection_field: null
+      one_deselect_action: nullify
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_movies
+      column: category
+      foreign_key_table: tavuno_categories
+      foreign_key_column: id
+      constraint_name: tavuno_movies_category_foreign
+      on_update: NO ACTION
+      on_delete: SET NULL
+  - collection: tavuno_playback_sessions
+    field: profile
+    related_collection: tavuno_profiles
+    meta:
+      junction_field: null
+      many_collection: tavuno_playback_sessions
+      many_field: profile
+      one_allowed_collections: null
+      one_collection: tavuno_profiles
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_playback_sessions
+      column: profile
+      foreign_key_table: tavuno_profiles
+      foreign_key_column: id
+      constraint_name: tavuno_playback_sessions_profile_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_playback_sessions
+    field: device
+    related_collection: tavuno_devices
+    meta:
+      junction_field: null
+      many_collection: tavuno_playback_sessions
+      many_field: device
+      one_allowed_collections: null
+      one_collection: tavuno_devices
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_playback_sessions
+      column: device
+      foreign_key_table: tavuno_devices
+      foreign_key_column: id
+      constraint_name: tavuno_playback_sessions_device_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_profiles
+    field: directus_user
+    related_collection: directus_users
+    meta:
+      junction_field: null
+      many_collection: tavuno_profiles
+      many_field: directus_user
+      one_allowed_collections: null
+      one_collection: directus_users
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_profiles
+      column: directus_user
+      foreign_key_table: directus_users
+      foreign_key_column: id
+      constraint_name: tavuno_profiles_directus_user_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_seasons
+    field: series
+    related_collection: tavuno_series
+    meta:
+      junction_field: null
+      many_collection: tavuno_seasons
+      many_field: series
+      one_allowed_collections: null
+      one_collection: tavuno_series
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_seasons
+      column: series
+      foreign_key_table: tavuno_series
+      foreign_key_column: id
+      constraint_name: tavuno_seasons_series_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_series
+    field: category
+    related_collection: tavuno_categories
+    meta:
+      junction_field: null
+      many_collection: tavuno_series
+      many_field: category
+      one_allowed_collections: null
+      one_collection: tavuno_categories
+      one_collection_field: null
+      one_deselect_action: nullify
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_series
+      column: category
+      foreign_key_table: tavuno_categories
+      foreign_key_column: id
+      constraint_name: tavuno_series_category_foreign
+      on_update: NO ACTION
+      on_delete: SET NULL
+  - collection: tavuno_subscriptions
+    field: profile
+    related_collection: tavuno_profiles
+    meta:
+      junction_field: null
+      many_collection: tavuno_subscriptions
+      many_field: profile
+      one_allowed_collections: null
+      one_collection: tavuno_profiles
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_subscriptions
+      column: profile
+      foreign_key_table: tavuno_profiles
+      foreign_key_column: id
+      constraint_name: tavuno_subscriptions_profile_foreign
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: tavuno_subscriptions
+    field: plan
+    related_collection: tavuno_plans
+    meta:
+      junction_field: null
+      many_collection: tavuno_subscriptions
+      many_field: plan
+      one_allowed_collections: null
+      one_collection: tavuno_plans
+      one_collection_field: null
+      one_deselect_action: nullify
+      one_field: null
+      sort_field: null
+    schema:
+      table: tavuno_subscriptions
+      column: plan
+      foreign_key_table: tavuno_plans
+      foreign_key_column: id
+      constraint_name: tavuno_subscriptions_plan_foreign
+      on_update: NO ACTION
+      on_delete: RESTRICT
