@@ -17,6 +17,7 @@ import com.streamvault.data.provider.DefaultProviderCapabilityRegistry
 import com.streamvault.data.provider.JellyfinCapabilityFactory
 import com.streamvault.data.provider.M3uCapabilityFactory
 import com.streamvault.data.provider.StalkerCapabilityFactory
+import com.streamvault.data.provider.TavunoCapabilityFactory
 import com.streamvault.data.provider.XtreamCapabilityFactory
 import com.streamvault.data.remote.xtream.PlaybackObservationCoordinator
 import com.streamvault.data.remote.xtream.PlaybackObservationSink
@@ -182,9 +183,10 @@ abstract class RepositoryModule {
             xtream: XtreamCapabilityFactory,
             stalker: StalkerCapabilityFactory,
             m3u: M3uCapabilityFactory,
-            jellyfin: JellyfinCapabilityFactory
+            jellyfin: JellyfinCapabilityFactory,
+            tavuno: TavunoCapabilityFactory
         ): ProviderCapabilityRegistry = DefaultProviderCapabilityRegistry(
-            listOf(xtream, stalker, m3u, jellyfin)
+            listOf(xtream, stalker, m3u, jellyfin, tavuno)
         )
     }
 }
