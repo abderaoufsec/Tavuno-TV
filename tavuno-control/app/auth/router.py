@@ -65,8 +65,15 @@ def login(
             ip=client_ip,
         )
     except ValueError as e:
+        # Return 403 for device limit errors, 401 for credentials errors
+        error_msg = str(e).lower()
+        if "device_limit_reached" in error_msg or "device_revoked" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=str(e)
+            )
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED if "credentials" in str(e).lower() else status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
         )
 

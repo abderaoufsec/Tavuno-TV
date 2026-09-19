@@ -55,7 +55,7 @@ class AuthService:
                 # Use generic error to avoid email enumeration
                 raise ValueError("Invalid credentials")
             
-            # Verify password
+            # Verify password (profile is guaranteed to exist here)
             if not verify_password(password, profile['password_hash']):
                 raise ValueError("Invalid credentials")
 
@@ -80,7 +80,40 @@ class AuthService:
                 )
                 device_id = device['id']
             else:
-                # New device - will check device limit in calling code
+                # New device - check device limit
+                # Get profile's active subscription → plan → max_devices
+                subscription = conn.execute(
+                    """
+                    SELECT s.id, s.status, s.expires_at, p.max_devices
+                    FROM tavuno_subscriptions s
+                    JOIN tavuno_plans p ON s.plan = p.id
+                    WHERE s.profile = %s AND s.status = 'active' AND s.expires_at > NOW()
+                    ORDER BY s.expires_at DESC
+                    LIMIT 1
+                    """,
+                    (profile['id'],),
+                ).fetchone()
+                
+                # Default to 1 device if no active subscription
+                max_devices = 1
+                if subscription:
+                    max_devices = subscription['max_devices'] or 1
+                
+                # Count active (non-revoked) devices for this profile
+                active_count = conn.execute(
+                    """
+                    SELECT COUNT(*) as count
+                    FROM tavuno_devices
+                    WHERE profile = %s AND revoked_at IS NULL
+                    """,
+                    (profile['id'],),
+                ).fetchone()['count']
+                
+                # Check if limit reached
+                if active_count >= max_devices:
+                    raise ValueError("device_limit_reached")
+                
+                # Create new device
                 result = conn.execute(
                     """
                     INSERT INTO tavuno_devices (profile, name, device_fingerprint, platform, is_active, last_seen_at)
