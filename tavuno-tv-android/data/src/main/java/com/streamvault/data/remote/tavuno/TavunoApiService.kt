@@ -22,15 +22,8 @@ interface TavunoApiService {
     suspend fun logout(@Body request: RefreshRequest): Response<Unit>
 
     @GET("v1/devices")
-    suspend fun listDevices(
-        @Header("X-Device-Fingerprint") deviceFingerprint: String,
-        @Header("Authorization") authorization: String
-    ): Response<List<DeviceDto>>
+    suspend fun listDevices(): Response<List<DeviceDto>>
 
     @DELETE("v1/devices/{id}")
-    suspend fun revokeDevice(
-        @Path("id") deviceId: Int,
-        @Header("X-Device-Fingerprint") deviceFingerprint: String,
-        @Header("Authorization") authorization: String
-    ): Response<Unit>
+    suspend fun revokeDevice(@Path("id") deviceId: Int): Response<Unit>
 }
