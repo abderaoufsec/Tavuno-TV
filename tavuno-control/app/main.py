@@ -12,6 +12,7 @@ from .config import get_settings
 from .playback import authorize_live_playback, heartbeat_session, stop_session, get_profile_from_token, generate_auth_token, verify_playback_token
 from .services import Services
 from .auth.router import router as auth_router
+from .devices.router import router as devices_router
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("tavuno-control")
@@ -72,8 +73,9 @@ app = FastAPI(
 )
 app.state.services = None
 
-# Include auth router
+# Include routers
 app.include_router(auth_router)
+app.include_router(devices_router)
 
 
 def get_services(request: Request) -> Services:
