@@ -300,7 +300,8 @@ private fun logoSourceLabel(policy: ChannelLogoSourcePolicy): String = stringRes
 private fun supportsGuideAndLogoPolicy(providerType: ProviderType): Boolean = when (providerType) {
     ProviderType.XTREAM_CODES,
     ProviderType.STALKER_PORTAL,
-    ProviderType.M3U -> true
+    ProviderType.M3U,
+    ProviderType.TAVUNO -> true
     ProviderType.JELLYFIN -> false
 }
 

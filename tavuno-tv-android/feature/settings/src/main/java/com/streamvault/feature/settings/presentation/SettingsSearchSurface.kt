@@ -334,6 +334,7 @@ private fun resolvedSettingsCatalog(
         setting("about.github", SettingsCategory.ABOUT, SettingsPage.APP_INFO, R.string.settings_github, "source code"),
         setting("about.donate", SettingsCategory.ABOUT, SettingsPage.APP_INFO, R.string.settings_donate, "support"),
         setting("about.close_app", SettingsCategory.ABOUT, SettingsPage.APP_INFO, R.string.settings_close_app, "exit"),
+        setting("about.attribution", SettingsCategory.ABOUT, SettingsPage.ATTRIBUTION, R.string.settings_page_attribution, "attribution"),
     )
     (pageEntries + controlEntries).map { entry ->
         when {

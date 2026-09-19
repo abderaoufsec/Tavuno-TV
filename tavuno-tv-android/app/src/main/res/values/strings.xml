@@ -1,6 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">StreamVault</string>
+    <string name="app_name">Tavuno TV</string>
+    <string name="app_attribution">Based on StreamVault IPTV by Davidona</string>
+    <string name="app_attribution_link">https://github.com/Davidona/StreamVault-IPTV</string>
 
     
     <string name="nav_home">Home</string>
@@ -179,6 +181,8 @@
     <string name="settings_buffer_duration">Buffer Duration</string>
     <string name="settings_buffer_5s">5 seconds</string>
     <string name="settings_about_subtitle">Version, build, and support details for this installation.</string>
+    <string name="settings_page_attribution">Attribution</string>
+    <string name="settings_page_attribution_description">Open source license information</string>
     <string name="settings_syncing">Syncing data, please wait...</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_sync_option_all">Sync All</string>

@@ -304,6 +304,10 @@ services:
       OME_PLAYBACK_BASE_URL: http://localhost:8080/media
       PLAYBACK_TOKEN_SECRET: ${PLAYBACK_TOKEN_SECRET:-tavuno-playback-secret-key}
       PLAYBACK_TOKEN_TTL_SECONDS: ${PLAYBACK_TOKEN_TTL_SECONDS:-120}
+      JWT_SECRET: ${JWT_SECRET:-tavuno-jwt-secret-key-change-in-production}
+      JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+      JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-2592000}
+      PASSWORD_HASH_SCHEME: ${PASSWORD_HASH_SCHEME:-bcrypt}
 
     healthcheck:
       test:

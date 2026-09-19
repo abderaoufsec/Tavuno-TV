@@ -33,6 +33,10 @@
     <string name="settings_recording_title">Recording</string>
     <string name="settings_backup_restore">Backup &amp; Restore</string>
     <string name="settings_about">About</string>
+    <string name="settings_about_attribution">Tavuno TV is based on StreamVault IPTV</string>
+    <string name="settings_about_attribution_link">https://github.com/Davidona/StreamVault-IPTV</string>
+    <string name="settings_page_attribution">Attribution</string>
+    <string name="settings_page_attribution_description">Open source license information</string>
     <string name="settings_vod_view_mode">VOD layout</string>
     <string name="settings_vod_view_mode_subtitle">Choose between the modern shelves view and a classic split layout.</string>
     <string name="settings_vod_view_mode_modern">Modern</string>

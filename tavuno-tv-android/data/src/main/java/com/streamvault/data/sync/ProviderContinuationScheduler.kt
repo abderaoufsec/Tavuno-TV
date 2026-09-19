@@ -37,7 +37,8 @@ internal class ProviderContinuationScheduler(
                 )
             }
             ProviderType.M3U,
-            ProviderType.JELLYFIN -> check(indexWork.isEmpty()) {
+            ProviderType.JELLYFIN,
+            ProviderType.TAVUNO -> check(indexWork.isEmpty()) {
                 "${snapshot.provider.type} declared unsupported catalog index continuation work"
             }
         }
