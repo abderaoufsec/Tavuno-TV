@@ -178,16 +178,16 @@ tavuno-control/
 
 ### Tasks
 
-* [ ] Choose backend framework
-* [ ] Create project
-* [ ] Environment configuration
-* [ ] Logging
-* [ ] Error handling
-* [ ] PostgreSQL/Directus integration
-* [ ] Redis integration
-* [ ] API structure
-* [ ] OpenAPI documentation
-* [ ] Automated tests
+* [x] Choose backend framework
+* [x] Create project
+* [x] Environment configuration
+* [x] Logging
+* [x] Error handling
+* [x] PostgreSQL/Directus integration
+* [x] Redis integration
+* [x] API structure
+* [x] OpenAPI documentation
+* [x] Automated tests
 
 ### First APIs
 
@@ -225,17 +225,17 @@ Dispatcharr
 
 ### Tasks
 
-* [ ] Connect API
-* [ ] Authenticate server-side
-* [ ] Import channels
-* [ ] Import categories
-* [ ] Import stream information
-* [ ] Import EPG
-* [ ] Import VOD
-* [ ] Store external IDs
-* [ ] Synchronization job
-* [ ] Error handling
-* [ ] Health monitoring
+* [x] Connect API
+* [x] Authenticate server-side
+* [x] Import channels
+* [x] Import categories
+* [x] Import stream information
+* [x] Import EPG
+* [x] Import VOD
+* [x] Store external IDs
+* [x] Synchronization job
+* [x] Error handling
+* [x] Health monitoring
 
 ### Important
 
@@ -277,14 +277,14 @@ Tavuno API
 
 ### Tasks
 
-* [ ] EPG ingestion
-* [ ] Channel matching
-* [ ] Programme normalization
-* [ ] Current programme
-* [ ] Next programme
-* [ ] Schedule
-* [ ] EPG caching
-* [ ] Automatic synchronization
+* [x] EPG ingestion
+* [x] Channel matching
+* [x] Programme normalization
+* [x] Current programme
+* [x] Next programme
+* [x] Schedule
+* [x] EPG caching
+* [x] Automatic synchronization
 
 ### Done when
 
@@ -318,16 +318,16 @@ Media3
 
 ### Tasks
 
-* [ ] Configure OME
-* [ ] Configure ingest
-* [ ] Configure output
-* [ ] Test HLS
-* [ ] Test LL-HLS
-* [ ] Test stream authentication
-* [ ] Test stream failure
-* [ ] Test recovery
-* [ ] Measure latency
-* [ ] Measure CPU/RAM/network
+* [x] Configure OME
+* [x] Configure ingest
+* [x] Configure output
+* [x] Test HLS
+* [x] Test LL-HLS
+* [x] Test stream authentication
+* [x] Test stream failure
+* [x] Test recovery
+* [x] Measure latency
+* [x] Measure CPU/RAM/network
 
 ### Done when
 
@@ -367,15 +367,15 @@ OME
 
 ### Tasks
 
-* [ ] Authentication
-* [ ] Device validation
-* [ ] Subscription validation
-* [ ] Entitlement validation
-* [ ] Session creation
-* [ ] Temporary authorization
-* [ ] Expiration
-* [ ] Heartbeat
-* [ ] Session termination
+* [x] Authentication
+* [x] Device validation
+* [x] Subscription validation
+* [x] Entitlement validation
+* [x] Session creation
+* [x] Temporary authorization
+* [x] Expiration
+* [x] Heartbeat
+* [x] Session termination
 
 ### Done when
 

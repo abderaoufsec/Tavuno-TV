@@ -16,6 +16,20 @@ class Settings(BaseSettings):
     redis_host: str = Field(default="redis", validation_alias="REDIS_HOST")
     redis_port: int = Field(default=6379, validation_alias="REDIS_PORT")
     redis_password: str = Field(validation_alias="REDIS_PASSWORD")
+    catalog_cache_seconds: int = Field(default=30, validation_alias="TAVUNO_CATALOG_CACHE_SECONDS")
+
+    dispatcharr_url: str = Field(default="http://dispatcharr:9191", validation_alias="DISPATCHARR_URL")
+    dispatcharr_api_key: str | None = Field(default=None, validation_alias="DISPATCHARR_API_KEY")
+    dispatcharr_expected_version: str = Field(default="0.27.2", validation_alias="DISPATCHARR_EXPECTED_VERSION")
+    dispatcharr_sync_interval_seconds: int = Field(default=3600, validation_alias="DISPATCHARR_SYNC_INTERVAL_SECONDS")
+    dispatcharr_timeout_seconds: float = Field(default=20.0, validation_alias="DISPATCHARR_TIMEOUT_SECONDS")
+
+    ome_api_url: str = Field(default="http://ome:8081", validation_alias="OME_API_URL")
+    ome_api_token: str | None = Field(default=None, validation_alias="OME_API_TOKEN")
+    ome_playback_base_url: str = Field(default="http://localhost:8080/media", validation_alias="OME_PLAYBACK_BASE_URL")
+
+    playback_token_secret: str = Field(default="tavuno-playback-secret-key", validation_alias="PLAYBACK_TOKEN_SECRET")
+    playback_token_ttl_seconds: int = Field(default=120, validation_alias="PLAYBACK_TOKEN_TTL_SECONDS")
 
     @property
     def postgres_dsn(self) -> str:
