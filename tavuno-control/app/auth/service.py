@@ -220,7 +220,7 @@ class AuthService:
 
         with self._db() as conn:
             profile = conn.execute(
-                "SELECT id, email, display_name, role FROM tavuno_profiles WHERE id = %s AND status = 'active'",
+                "SELECT id, email, display_name, role FROM tavuno_profiles WHERE id = %s",
                 (profile_id,),
             ).fetchone()
             
@@ -236,7 +236,7 @@ class AuthService:
                 raise ValueError('Device not found or revoked')
 
             return {
-                'id': profile['id'],
+                'profile_id': profile['id'],
                 'email': profile['email'],
                 'display_name': profile['display_name'],
                 'role': profile['role'],

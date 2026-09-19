@@ -103,7 +103,13 @@ def get_current_user(
 ):
     """Get current user profile from access token."""
     try:
-        return auth_service.get_profile_from_token(credentials.credentials)
+        profile = auth_service.get_profile_from_token(credentials.credentials)
+        return {
+            'id': profile['profile_id'],
+            'email': profile['email'],
+            'display_name': profile['display_name'],
+            'role': profile['role'],
+        }
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -33,7 +33,7 @@ def list_devices(
     
     try:
         profile = auth_service.get_profile_from_token(token)
-        return device_service.list_devices(profile['id'], device_fingerprint)
+        return device_service.list_devices(profile['profile_id'], device_fingerprint)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,7 +85,7 @@ def revoke_device(
     
     try:
         profile = auth_service.get_profile_from_token(token)
-        device_service.revoke_device(profile['id'], device_id)
+        device_service.revoke_device(profile['profile_id'], device_id)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND if "not found" in str(e).lower() else status.HTTP_403_FORBIDDEN,

@@ -13,6 +13,7 @@ class RecordingConnection:
         self._existing_slugs = set()
         self.series_by_slug: dict[str, int] = {}
         self._ids = {"category": 1, "channel": 1, "movie": 1, "series": 5, "season": 1, "episode": 1}
+        self._rowcount = 0
 
     def execute(self, query, parameters=()):
         self.query = " ".join(query.split())
@@ -20,9 +21,17 @@ class RecordingConnection:
         self.statements.append((self.query, parameters))
         if "INSERT INTO tavuno_series " in self.query:
             self.series_by_slug[parameters[1]] = self._ids["series"]
+        self._rowcount = 0
         return self
 
+    @property
+    def rowcount(self):
+        return self._rowcount
+
     def commit(self):
+        pass
+
+    def rollback(self):
         pass
 
     def fetchall(self):
@@ -75,7 +84,7 @@ class RecordingConnection:
 
 class FakeDispatcharr:
     def get_version(self):
-        return {"version": "0.27.2"}
+        return {"version": "0.28.0"}
 
     def get_channel_groups(self):
         return [{"id": 1, "name": "News"}]
@@ -90,6 +99,8 @@ class FakeDispatcharr:
         return [{"id": 99, "name": "News A", "channel_id": 10, "url": "http://should-not-be-used"}]
 
     def get_channel_streams(self, channel_id: int):
+        if channel_id == 10:
+            return [{"id": 99, "name": "News A", "url": "http://stream.example.com/stream.ts"}]
         return []
 
     def get_epg_programs(self):
@@ -126,7 +137,7 @@ class SyncServiceTests(unittest.TestCase):
     def test_sync_all_imports_channels_streams_and_vod(self):
         connection = RecordingConnection()
         redis = MagicMock()
-        service = SyncService(FakeDispatcharr(), redis=redis, expected_version="0.27.2")
+        service = SyncService(FakeDispatcharr(), redis=redis, expected_version="0.28.0")
         summary = service.sync_all(connection)
 
         self.assertEqual(summary["status"], "success")
