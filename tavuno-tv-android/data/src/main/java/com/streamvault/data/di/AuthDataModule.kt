@@ -16,7 +16,6 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
-import javax.inject.Named
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
@@ -32,11 +31,6 @@ abstract class AuthDataModule {
     abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
 
     companion object {
-        @Provides
-        @Singleton
-        fun provideDeviceFingerprintGenerator(): DeviceFingerprintGenerator {
-            return DeviceFingerprintGenerator() // Context injected via constructor
-        }
 
         @Provides
         @Singleton
