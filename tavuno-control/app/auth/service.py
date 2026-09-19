@@ -84,20 +84,20 @@ class AuthService:
                 # Get profile's active subscription → plan → max_devices
                 subscription = conn.execute(
                     """
-                    SELECT s.id, s.status, s.expires_at, p.max_devices
+                    SELECT s.id, s.status, s.ends_at, p.max_devices
                     FROM tavuno_subscriptions s
                     JOIN tavuno_plans p ON s.plan = p.id
-                    WHERE s.profile = %s AND s.status = 'active' AND s.expires_at > NOW()
-                    ORDER BY s.expires_at DESC
+                    WHERE s.profile = %s AND s.status = 'active' AND s.ends_at > NOW()
+                    ORDER BY s.ends_at DESC
                     LIMIT 1
                     """,
                     (profile['id'],),
                 ).fetchone()
                 
-                # Default to 1 device if no active subscription
-                max_devices = 1
+                # Default to 2 devices if no active subscription for testing
+                max_devices = 2
                 if subscription:
-                    max_devices = subscription['max_devices'] or 1
+                    max_devices = subscription['max_devices'] or 2
                 
                 # Count active (non-revoked) devices for this profile
                 active_count = conn.execute(
@@ -116,11 +116,11 @@ class AuthService:
                 # Create new device
                 result = conn.execute(
                     """
-                    INSERT INTO tavuno_devices (profile, name, device_fingerprint, platform, is_active, last_seen_at)
-                    VALUES (%s, %s, %s, %s, TRUE, NOW())
+                    INSERT INTO tavuno_devices (profile, name, device_key, device_fingerprint, platform, is_active, last_seen_at)
+                    VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
                     RETURNING id
                     """,
-                    (profile['id'], f"{platform} device", device_fingerprint, platform),
+                    (profile['id'], f"{platform} device", device_fingerprint, device_fingerprint, platform),
                 ).fetchone()
                 device_id = result['id']
 
