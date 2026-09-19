@@ -8,7 +8,7 @@
     }
 
     handle_path /media/* {
-        reverse_proxy ome:3333
+        reverse_proxy tavuno-ovenmediaengine:3333
     }
 
     respond / "Tavuno TV M1 reverse proxy is running" 200

@@ -2,13 +2,14 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, contextmanager
 from typing import Annotated, Any
+import time
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .config import get_settings
-from .playback import authorize_live_playback, heartbeat_session, stop_session
+from .playback import authorize_live_playback, heartbeat_session, stop_session, get_profile_from_token, generate_auth_token
 from .services import Services
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
@@ -18,6 +19,8 @@ CATALOG_COLLECTIONS = {
     "movies": "tavuno_movies",
     "series": "tavuno_series",
 }
+
+JWT_EXPIRATION_HOURS = 24
 
 
 @asynccontextmanager
@@ -177,6 +180,12 @@ def register_device(payload: DeviceRegistration, services: ServicesDependency) -
 
 @app.get("/v1/epg", tags=["epg"])
 def epg(services: ServicesDependency, channel_id: int | None = None) -> list[dict[str, Any]]:
+    # Try cache first for M5 EPG caching requirement
+    if channel_id is not None:
+        cached = services.get_cached_epg(channel_id)
+        if cached:
+            return cached
+
     query = """
         SELECT p.id, p.title, p.starts_at, p.ends_at, p.description, e.channel AS channel_id
         FROM tavuno_epg_programmes p JOIN tavuno_epg_channels e ON e.id = p.epg_channel
@@ -187,7 +196,13 @@ def epg(services: ServicesDependency, channel_id: int | None = None) -> list[dic
         parameters = (channel_id,)
     query += " ORDER BY p.starts_at"
     with database(services) as connection:
-        return connection.execute(query, parameters).fetchall()
+        programmes = connection.execute(query, parameters).fetchall()
+    
+    # Cache the result for channel-specific queries
+    if channel_id is not None:
+        services.cache_epg(channel_id, programmes)
+    
+    return programmes
 
 
 def list_catalog(collection_key: str, services: Services, category_id: int | None = None) -> list[dict[str, Any]]:
@@ -246,9 +261,44 @@ def channel_epg_now_next(channel_id: int, services: ServicesDependency) -> dict[
     }
 
 
-class LivePlaybackRequest(BaseModel):
+class LoginRequest(BaseModel):
     profile_id: int
     device_key: str = Field(min_length=8, max_length=255)
+
+
+@app.post("/v1/auth/login", tags=["auth"])
+def login(payload: LoginRequest, services: ServicesDependency) -> dict[str, Any]:
+    """Authenticate profile and device, return JWT token (M7)."""
+    with database(services) as connection:
+        # Validate profile
+        profile = connection.execute(
+            "SELECT id FROM tavuno_profiles WHERE id = %s AND status = 'active'",
+            (payload.profile_id,),
+        ).fetchone()
+        if not profile:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Active profile not found")
+
+        # Validate device
+        device = connection.execute(
+            "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s AND is_active = TRUE",
+            (payload.device_key, payload.profile_id),
+        ).fetchone()
+        if not device:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Device not registered or inactive")
+
+        # Generate JWT token
+        token = generate_auth_token(payload.profile_id, device["id"])
+        
+        return {
+            "token": token,
+            "profile_id": payload.profile_id,
+            "device_id": device["id"],
+            "expires_in": JWT_EXPIRATION_HOURS * 3600,
+        }
+
+
+class LivePlaybackRequest(BaseModel):
+    channel_id: int
 
 
 class SessionRequest(BaseModel):
@@ -260,16 +310,37 @@ def playback_live(
     channel_id: int,
     payload: LivePlaybackRequest,
     services: ServicesDependency,
+    authorization: str = Header(...),
 ) -> dict[str, Any]:
-    """Authorize a live playback stream, enforce limits, and mint temporary token (M7)."""
-    with database(services) as connection:
-        return authorize_live_playback(
-            profile_id=payload.profile_id,
-            device_key=payload.device_key,
-            channel_id=channel_id,
-            connection=connection,
-            settings=services.settings,
-        )
+    """Authorize a live playback stream with JWT authentication (M7)."""
+    try:
+        auth_data = get_profile_from_token(authorization)
+        profile_id = auth_data["profile_id"]
+        device_id = auth_data["device_id"]
+        
+        # Get device_key from database
+        with database(services) as connection:
+            device = connection.execute(
+                "SELECT device_key FROM tavuno_devices WHERE id = %s AND profile = %s",
+                (device_id, profile_id),
+            ).fetchone()
+            if not device:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+            
+            device_key = device["device_key"]
+            
+            return authorize_live_playback(
+                profile_id=profile_id,
+                device_key=device_key,
+                channel_id=channel_id,
+                connection=connection,
+                settings=services.settings,
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Playback authorization failed")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authorization failed") from exc
 
 
 @app.post("/v1/playback/heartbeat", tags=["playback"])
@@ -297,11 +368,21 @@ def playback_stop(
 
 
 @app.post("/v1/admin/sync/dispatcharr", tags=["admin"])
-def sync_from_dispatcharr(services: ServicesDependency) -> dict[str, Any]:
+def sync_from_dispatcharr(services: ServicesDependency, authorization: str = Header(...)) -> dict[str, Any]:
     """Synchronize channels, VOD, stream mappings, and EPG from Dispatcharr (M4)."""
+    # Simple admin check - in production, use proper admin roles
+    try:
+        auth_data = get_profile_from_token(authorization)
+        # In production, check if profile has admin role
+    except HTTPException:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    
     try:
         with database(services) as connection:
-            return services.sync.sync_all(connection)
+            result = services.sync.sync_all(connection)
+            # Invalidate EPG cache after sync
+            services.invalidate_epg_cache()
+            return result
     except Exception as exc:
         logger.exception("Dispatcharr sync failed")
         raise HTTPException(

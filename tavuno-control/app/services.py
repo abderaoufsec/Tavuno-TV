@@ -12,6 +12,9 @@ from .dispatcharr_client import DispatcharrClient
 from .ome_client import OmeClient
 from .sync_service import CATALOG_CACHE_PREFIX, SyncService
 
+EPG_CACHE_PREFIX = "tavuno:epg:"
+EPG_CACHE_TTL = 300  # 5 minutes
+
 
 class Services:
     def __init__(self, settings: Settings):
@@ -58,6 +61,34 @@ class Services:
         except Exception:
             pass
         return data
+
+    def cache_epg(self, channel_id: int, programmes: list[dict[str, Any]]) -> None:
+        cache_key = f"{EPG_CACHE_PREFIX}channel:{channel_id}"
+        try:
+            self.redis.setex(cache_key, EPG_CACHE_TTL, json.dumps(programmes, default=str))
+        except Exception:
+            pass
+
+    def get_cached_epg(self, channel_id: int) -> list[dict[str, Any]] | None:
+        cache_key = f"{EPG_CACHE_PREFIX}channel:{channel_id}"
+        try:
+            raw = self.redis.get(cache_key)
+            if raw:
+                return json.loads(raw)
+        except Exception:
+            pass
+        return None
+
+    def invalidate_epg_cache(self, channel_id: int | None = None) -> None:
+        try:
+            if channel_id is not None:
+                cache_key = f"{EPG_CACHE_PREFIX}channel:{channel_id}"
+                self.redis.delete(cache_key)
+            else:
+                for key in self.redis.scan_iter(f"{EPG_CACHE_PREFIX}*"):
+                    self.redis.delete(key)
+        except Exception:
+            pass
 
     def health(self) -> dict[str, str]:
         with psycopg.connect(self.settings.postgres_dsn) as connection:

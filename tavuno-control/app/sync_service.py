@@ -32,13 +32,22 @@ def _int(value: Any) -> int | None:
 def _stream_dispatcharr_channel_ids(stream: dict[str, Any]) -> list[int]:
     ids: list[int] = []
     for key in ("channel", "channel_id"):
-        parsed = _int(stream.get(key)) if not isinstance(stream.get(key), dict) else _int(stream.get(key, {}).get("id"))
+        value = stream.get(key)
+        if value is None:
+            continue
+        if isinstance(value, dict):
+            parsed = _int(value.get("id"))
+        else:
+            parsed = _int(value)
         if parsed is not None:
             ids.append(parsed)
     channels = stream.get("channels") or []
     if isinstance(channels, list):
         for item in channels:
-            parsed = _int(item if not isinstance(item, dict) else item.get("id"))
+            if isinstance(item, dict):
+                parsed = _int(item.get("id"))
+            else:
+                parsed = _int(item)
             if parsed is not None:
                 ids.append(parsed)
     return list(dict.fromkeys(ids))
@@ -427,6 +436,7 @@ class SyncService:
                 (title, slug, category_id, synopsis, year),
             )
             synced += 1
+        logger.info("VOD movies sync: %d movies processed", synced)
         return synced
 
     def sync_series(self, connection: Any) -> int:
@@ -465,6 +475,7 @@ class SyncService:
                 (title, slug, category_id, synopsis),
             )
             synced += 1
+        logger.info("VOD series sync: %d series processed", synced)
         return synced
 
     def _ensure_season(self, connection: Any, series_id: int, season_number: int) -> int:
@@ -532,4 +543,5 @@ class SyncService:
                 (season_id, episode_number, title, synopsis),
             )
             synced += 1
+        logger.info("VOD episodes sync: %d episodes processed", synced)
         return synced

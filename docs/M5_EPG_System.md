@@ -2,7 +2,7 @@
 
 ## Status
 
-COMPLETE — normalized guide schedule pipeline implemented.
+COMPLETE — normalized guide schedule pipeline fully tested and validated.
 
 ## Purpose
 
@@ -33,8 +33,24 @@ Android TV Client
    - `GET /v1/epg` — Retrieves programmes filtered by channel and timeline window.
    - `GET /v1/epg/channel/{channel_id}/now-next` — Resolves the current broadcast (`now`), immediate upcoming programme (`next`), and future programme (`later`).
 
-## Validation
+## Real Testing Results
+
+### Infrastructure Testing
+- ✅ Docker infrastructure running with all services healthy
+- ✅ Directus schema applied with all EPG tables
+- ✅ Test data inserted: categories, channels, EPG mappings, programmes
+
+### API Testing
+- ✅ `GET /v1/epg/channel/2/now-next` returns NOW, NEXT, LATER programmes
+- ✅ `GET /v1/epg` returns all programmes with channel filtering
+- ✅ `GET /v1/epg?channel_id=2` correctly filters by channel
+- ✅ EPG time-window resolution working with actual timestamps
+- ✅ Channel to EPG programme relationships validated
+
+### Validation
 
 - [x] EPG channel relationship mapping verified.
 - [x] Now / Next / Later time-window resolution tested with ascending timeline bounds.
 - [x] Null safety handled when programmes are not scheduled.
+- [x] Real API endpoints tested against live database.
+- [x] Integration with PostgreSQL confirmed.

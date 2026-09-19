@@ -3,9 +3,50 @@ import hmac
 import logging
 import time
 from typing import Any
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Header
+import jwt
 
 logger = logging.getLogger("tavuno-control.playback")
+
+JWT_SECRET = "tavuno-jwt-secret-key"
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24
+
+
+def generate_auth_token(profile_id: int, device_id: int) -> str:
+    """Generate JWT authentication token for profile and device."""
+    payload = {
+        "profile_id": profile_id,
+        "device_id": device_id,
+        "exp": time.time() + (JWT_EXPIRATION_HOURS * 3600),
+        "iat": time.time(),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def verify_auth_token(token: str) -> dict[str, Any]:
+    """Verify JWT authentication token and return payload."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+
+def get_profile_from_token(authorization: str = Header(...)) -> dict[str, Any]:
+    """Extract and verify profile from Authorization header."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    payload = verify_auth_token(token)
+    
+    return {
+        "profile_id": payload["profile_id"],
+        "device_id": payload["device_id"],
+    }
 
 
 def mint_token(
@@ -73,8 +114,35 @@ def authorize_live_playback(
         (profile_id,),
     ).fetchone()
 
-    # Default limits if testing with fallback plan
-    max_concurrent = sub["max_concurrent_streams"] if sub else 2
+    if not sub:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Active subscription required for playback",
+        )
+
+    max_concurrent = sub["max_concurrent_streams"]
+    max_devices = sub["max_devices"]
+
+    # Check device limit
+    device_count = connection.execute(
+        """
+        SELECT COUNT(*) AS count FROM tavuno_devices
+        WHERE profile = %s AND is_active = TRUE
+        """,
+        (profile_id,),
+    ).fetchone()
+    
+    if device_count and device_count["count"] >= max_devices:
+        # Allow current device if already registered
+        current_device = connection.execute(
+            "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+            (device_key, profile_id),
+        ).fetchone()
+        if not current_device:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Device limit reached ({max_devices} devices)",
+            )
 
     # 4. Enforce concurrent stream limit
     active_sessions = connection.execute(
@@ -99,6 +167,24 @@ def authorize_live_playback(
     ).fetchone()
     if not channel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found or inactive")
+
+    # 5.5. Entitlement check - verify profile has access to this channel
+    entitlement = connection.execute(
+        """
+        SELECT e.id FROM tavuno_entitlements e
+        JOIN tavuno_subscriptions s ON s.id = e.subscription
+        WHERE s.profile = %s AND s.status = 'active'
+          AND (s.ends_at IS NULL OR s.ends_at > NOW())
+          AND e.resource_type = 'channel' AND e.resource_key = %s AND e.is_active = TRUE
+        """,
+        (profile_id, str(channel_id)),
+    ).fetchone()
+    
+    if not entitlement:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Channel not included in subscription entitlements",
+        )
 
     # Resolve stream source (Dispatcharr or OME mapping)
     source = connection.execute(
