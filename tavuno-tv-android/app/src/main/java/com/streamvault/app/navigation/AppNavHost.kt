@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import com.streamvault.app.navigation.graph.registerLiveGraph
 import com.streamvault.app.ui.components.shell.AppNavigationChrome
 import com.streamvault.app.ui.components.shell.AppScreenScaffold
@@ -33,6 +34,7 @@ import com.streamvault.domain.model.ContentType
 import com.streamvault.feature.system.api.SystemScaffoldContent
 import com.streamvault.feature.system.navigation.SystemRoutePatterns
 import com.streamvault.feature.system.navigation.registerSystemGraph
+import com.streamvault.app.auth.LoginScreen
 
 @Composable
 internal fun AppNavHost(
@@ -59,6 +61,13 @@ internal fun AppNavHost(
             onStartupNavigationRequested = onStartupNavigationRequested,
             scaffold = appSystemScaffold(onTopLevelDestinationRequested),
         )
+        composable("login") {
+            LoginScreen(
+                onSuccess = dropUnlessResumed {
+                    onStartupNavigationRequested(AppDestination.Home)
+                }
+            )
+        }
         registerProviderGraph(
             actions = actions,
             startupReady = startupReady,

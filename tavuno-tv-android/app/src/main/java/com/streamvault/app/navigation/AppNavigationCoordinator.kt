@@ -8,6 +8,7 @@ import com.streamvault.core.navigation.NavigationCommand
 import com.streamvault.core.navigation.NavigationOptions
 import com.streamvault.core.navigation.PlayerNavigationRequest
 import com.streamvault.data.preferences.PreferencesRepository
+import com.streamvault.data.preferences.TokenStore
 import com.streamvault.domain.model.AppLandingDestination
 import com.streamvault.domain.model.AppTopLevelDestination
 import com.streamvault.domain.model.CatalogLayout
@@ -38,7 +39,8 @@ class AppNavigationCoordinator @Inject constructor(
     private val commandIds: NavigationCommandIdSource,
     private val startupResolver: StartupNavigationResolver,
     private val preferencesRepository: PreferencesRepository,
-    private val providerRepository: ProviderRepository
+    private val providerRepository: ProviderRepository,
+    private val tokenStore: TokenStore
 ) : ViewModel() {
     private val commandQueue = ArrayDeque<PendingNavigationCommand>()
     private val _pendingCommand = MutableStateFlow<PendingNavigationCommand?>(null)
@@ -78,12 +80,20 @@ class AppNavigationCoordinator @Inject constructor(
                 .distinctUntilChanged()
                 .collectLatest { inputs ->
                     activeProviderId = inputs.providerId
+
+                    // Check authentication first
+                    val isLoggedIn = tokenStore.getAccessToken() != null
                     val landingDestination = AppTopLevelDestination.resolveLandingDestination(
                         preferred = inputs.preferredLanding,
                         destinations = inputs.topLevelDestinations
                     )
+                    val landingRoute = if (isLoggedIn) {
+                        startupResolver.destinationFor(landingDestination)
+                    } else {
+                        AppDestination.Login
+                    }
+
                     val resolutionKey = StartupResolutionKey(landingDestination)
-                    val landingRoute = startupResolver.destinationFor(landingDestination)
                     if (!startupNavigationRequested) {
                         resolvedStartupKey = resolutionKey
                     }
@@ -101,7 +111,11 @@ class AppNavigationCoordinator @Inject constructor(
                             )
                         }
                     }
-                    val playerRequest = startupResolver.resolvePlayerRequest(landingDestination)
+                    val playerRequest = if (isLoggedIn) {
+                        startupResolver.resolvePlayerRequest(landingDestination)
+                    } else {
+                        null
+                    }
                     if (!startupNavigationRequested || startupResolutionKey == resolutionKey) {
                         startupPlayerRequest = playerRequest
                         _state.update {

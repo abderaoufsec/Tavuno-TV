@@ -12,6 +12,7 @@ import java.net.URLDecoder
 
 internal object AppRoutePatterns {
     const val WELCOME = SystemRoutePatterns.WELCOME
+    const val LOGIN = "login"
     const val HOME = CatalogRoutePatterns.HOME
     const val LIVE_TV = LiveRoutePatterns.LIVE_TV
     const val LIVE_TV_DESTINATION = LiveRoutePatterns.LIVE_TV_DESTINATION
@@ -37,6 +38,7 @@ internal object AppRoutePatterns {
 internal object AppRouteCodec {
     fun encode(destination: AppDestination): String = when (destination) {
         AppDestination.Welcome -> AppRoutePatterns.WELCOME
+        AppDestination.Login -> AppRoutePatterns.LOGIN
         AppDestination.Home -> AppRoutePatterns.HOME
         is AppDestination.LiveTv -> destination.categoryId?.let { categoryId ->
             "${AppRoutePatterns.LIVE_TV}?categoryId=$categoryId"
@@ -85,6 +87,7 @@ internal object AppRouteCodec {
         val query = normalizedRoute.queryParameters()
         return when {
             path == AppRoutePatterns.WELCOME -> AppDestination.Welcome
+            path == AppRoutePatterns.LOGIN -> AppDestination.Login
             path == AppRoutePatterns.HOME -> AppDestination.Home
             path == AppRoutePatterns.LIVE_TV -> {
                 when {
@@ -195,6 +198,7 @@ internal object Routes {
     const val MOVIE_DETAIL = AppRoutePatterns.MOVIE_DETAIL
     const val SERIES_DETAIL = AppRoutePatterns.SERIES_DETAIL
     const val WELCOME = AppRoutePatterns.WELCOME
+    const val LOGIN = AppRoutePatterns.LOGIN
     const val PARENTAL_CONTROL_GROUPS = AppRoutePatterns.PARENTAL_CONTROL_GROUPS
     const val MULTI_VIEW = AppRoutePatterns.MULTI_VIEW
 
