@@ -1,52 +1,96 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-
+<?xml version="1.0" encoding="UTF-8"?>
 <Server version="8">
-
     <Name>OvenMediaEngine</Name>
-
     <Type>origin</Type>
-
     <IP>*</IP>
-
-    <PrivacyProtection>false</PrivacyProtection>
-
-    <Modules>
-
-        <HTTP2>
-            <Enable>true</Enable>
-        </HTTP2>
-
-        <LLHLS>
-            <Enable>true</Enable>
-        </LLHLS>
-
-    </Modules>
+    <StunServer>stun.l.google.com:19302</StunServer>
 
     <Bind>
-
         <Managers>
-
             <API>
                 <Port>8081</Port>
                 <WorkerCount>1</WorkerCount>
             </API>
-
         </Managers>
 
+        <Providers>
+            <RTMP>
+                <Port>1935</Port>
+            </RTMP>
+            <SRT>
+                <Port>9999</Port>
+            </SRT>
+        </Providers>
+        <Publishers>
+            <LLHLS>
+                <Port>3333</Port>
+            </LLHLS>
+            <WebRTC>
+                <Signalling>
+                    <Port>3333</Port>
+                </Signalling>
+                <IceCandidates>
+                    <IceCandidate>*:10000-10009/udp</IceCandidate>
+                </IceCandidates>
+            </WebRTC>
+        </Publishers>
     </Bind>
 
     <Managers>
-
         <Host>
             <Names>
                 <Name>*</Name>
             </Names>
         </Host>
-
         <API>
             <AccessToken>tavuno-m1-local</AccessToken>
         </API>
-
     </Managers>
 
+    <VirtualHosts>
+        <VirtualHost>
+            <Name>default</Name>
+            <Host>
+                <Names>
+                    <Name>*</Name>
+                </Names>
+            </Host>
+
+            <Applications>
+                <Application>
+                    <Name>tavuno</Name>
+                    <Type>live</Type>
+
+                    <OutputProfiles>
+                        <OutputProfile>
+                            <Name>bypass</Name>
+                            <OutputStreamName>${OriginStreamName}</OutputStreamName>
+                            <Encodes>
+                                <Video>
+                                    <Bypass>true</Bypass>
+                                </Video>
+                                <Audio>
+                                    <Bypass>true</Bypass>
+                                </Audio>
+                            </Encodes>
+                        </OutputProfile>
+                    </OutputProfiles>
+
+                    <Providers>
+                        <RTMP />
+                        <SRT />
+                    </Providers>
+
+                    <Publishers>
+                        <LLHLS>
+                            <ChunkDuration>0.5</ChunkDuration>
+                            <SegmentDuration>2</SegmentDuration>
+                            <SegmentCount>6</SegmentCount>
+                        </LLHLS>
+                        <WebRTC />
+                    </Publishers>
+                </Application>
+            </Applications>
+        </VirtualHost>
+    </VirtualHosts>
 </Server>
