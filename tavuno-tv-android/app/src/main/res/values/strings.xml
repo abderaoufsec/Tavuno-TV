@@ -1,6 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">StreamVault</string>
+    <string name="app_name">Tavuno TV</string>
+    <string name="app_attribution">Based on StreamVault IPTV by Davidona</string>
+    <string name="app_attribution_link">https://github.com/Davidona/StreamVault-IPTV</string>
 
     
     <string name="nav_home">Home</string>
