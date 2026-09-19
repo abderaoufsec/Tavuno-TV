@@ -1,6 +1,0 @@
-{
-  "name": "Tavuno TV",
-  "description": "OTT & IPTV streaming platform for Live TV, Movies, Series, Sports, and EPG Guide.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
