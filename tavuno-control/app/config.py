@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     playback_token_secret: str = Field(default="tavuno-playback-secret-key", validation_alias="PLAYBACK_TOKEN_SECRET")
     playback_token_ttl_seconds: int = Field(default=120, validation_alias="PLAYBACK_TOKEN_TTL_SECONDS")
 
+    jwt_secret: str = Field(default="tavuno-jwt-secret-key-change-in-production", validation_alias="JWT_SECRET")
+    jwt_access_ttl_seconds: int = Field(default=900, validation_alias="JWT_ACCESS_TTL_SECONDS")
+    jwt_refresh_ttl_seconds: int = Field(default=2592000, validation_alias="JWT_REFRESH_TTL_SECONDS")
+    password_hash_scheme: str = Field(default="bcrypt", validation_alias="PASSWORD_HASH_SCHEME")
+
     @property
     def postgres_dsn(self) -> str:
         return (
