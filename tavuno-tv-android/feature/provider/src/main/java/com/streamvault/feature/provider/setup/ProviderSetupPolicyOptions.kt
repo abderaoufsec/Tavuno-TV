@@ -232,7 +232,8 @@ internal fun supportsGuideAndLogoPolicy(sourceType: SourceType): Boolean = when 
     SourceType.XTREAM,
     SourceType.STALKER,
     SourceType.M3U_URL,
-    SourceType.M3U_FILE -> true
+    SourceType.M3U_FILE,
+    SourceType.TAVUNO -> true
     SourceType.JELLYFIN -> false
 }
 

@@ -1530,6 +1530,7 @@ class EpgViewModel @Inject constructor(
             com.streamvault.domain.model.ProviderType.M3U -> "M3U Playlist"
             com.streamvault.domain.model.ProviderType.STALKER_PORTAL -> "Stalker/MAG Portal"
             com.streamvault.domain.model.ProviderType.JELLYFIN -> "Jellyfin"
+            com.streamvault.domain.model.ProviderType.TAVUNO -> "Tavuno"
         }
     }
 
@@ -1555,6 +1556,8 @@ class EpgViewModel @Inject constructor(
                 } else {
                     "Jellyfin replay combines server guide data with optional XMLTV import."
                 }
+            com.streamvault.domain.model.ProviderType.TAVUNO ->
+                "Tavuno replay depends on server support."
         }
     }
 

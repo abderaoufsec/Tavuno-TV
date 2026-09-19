@@ -68,7 +68,8 @@ class ProviderSetupViewModel @Inject constructor(
         XTREAM,
         STALKER,
         M3U,
-        JELLYFIN
+        JELLYFIN,
+        TAVUNO
     }
 
     private val _uiState = MutableStateFlow(ProviderSetupState())
@@ -306,6 +307,7 @@ class ProviderSetupViewModel @Inject constructor(
                             ProviderType.STALKER_PORTAL -> 1
                             ProviderType.M3U -> 2
                             ProviderType.JELLYFIN -> 3
+                            ProviderType.TAVUNO -> 4
                         },
                         m3uTab = if (provider.m3uUrl.startsWith("file://")) 1 else 0
                     )
@@ -1200,5 +1202,6 @@ private fun defaultEpgSyncModeFor(sourceType: ProviderSetupViewModel.SetupSource
     ProviderSetupViewModel.SetupSourceType.STALKER,
     ProviderSetupViewModel.SetupSourceType.XTREAM,
     ProviderSetupViewModel.SetupSourceType.M3U,
-    ProviderSetupViewModel.SetupSourceType.JELLYFIN -> ProviderEpgSyncMode.BACKGROUND
+    ProviderSetupViewModel.SetupSourceType.JELLYFIN,
+    ProviderSetupViewModel.SetupSourceType.TAVUNO -> ProviderEpgSyncMode.BACKGROUND
 }

@@ -30,7 +30,7 @@ import com.streamvault.core.ui.theme.Surface as SurfaceColor
 import com.streamvault.core.ui.theme.SurfaceHighlight
 import com.streamvault.core.ui.theme.TextPrimary
 
-internal enum class SourceType { XTREAM, STALKER, M3U_URL, M3U_FILE, JELLYFIN }
+internal enum class SourceType { XTREAM, STALKER, M3U_URL, M3U_FILE, JELLYFIN, TAVUNO }
 
 @Composable
 internal fun SourceTypeTabRow(
@@ -74,6 +74,13 @@ internal fun SourceTypeTabRow(
                 text = androidx.compose.ui.res.stringResource(R.string.setup_tab_jellyfin),
                 isSelected = sourceType == SourceType.JELLYFIN,
                 onClick = { if (!isEditing) onSelect(SourceType.JELLYFIN) }
+            )
+        }
+        if (!isEditing || sourceType == SourceType.TAVUNO) {
+            TabButton(
+                text = "Tavuno",
+                isSelected = sourceType == SourceType.TAVUNO,
+                onClick = { if (!isEditing) onSelect(SourceType.TAVUNO) }
             )
         }
     }

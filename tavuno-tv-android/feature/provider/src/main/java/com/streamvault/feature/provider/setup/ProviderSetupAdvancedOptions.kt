@@ -156,7 +156,8 @@ internal fun AdvancedProviderOptionsSection(
         SourceType.XTREAM,
         SourceType.M3U_URL,
         SourceType.M3U_FILE,
-        SourceType.JELLYFIN -> ProviderEpgSyncMode.UPFRONT
+        SourceType.JELLYFIN,
+        SourceType.TAVUNO -> ProviderEpgSyncMode.UPFRONT
     }
 
     LaunchedEffect(uiState.isEditing, uiState.epgSyncMode, uiState.stalkerCatalogMode, uiState.xtreamLiveSyncMode, uiState.guideSourcePolicy, uiState.channelLogoSourcePolicy, sourceType) {

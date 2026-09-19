@@ -178,6 +178,9 @@ private fun buildCapabilitySummary(application: Context, provider: Provider): St
                 "Jellyfin catalog with direct streaming and guide data from the server."
             }
         }
+        ProviderType.TAVUNO -> {
+            "Tavuno catalog with live TV and VOD streaming."
+        }
     }
 }
 
@@ -186,6 +189,7 @@ private fun Provider.sourceLabel(): String = when (type) {
     ProviderType.M3U -> "M3U Playlist"
     ProviderType.STALKER_PORTAL -> "Stalker/MAG Portal"
     ProviderType.JELLYFIN -> "Jellyfin"
+    ProviderType.TAVUNO -> "Tavuno"
 }
 
 private fun Provider.expirySummary(): String {
@@ -223,5 +227,8 @@ private fun Provider.archiveSummary(): String = when (type) {
         } else {
             "Jellyfin replay combines server guide data with optional XMLTV coverage."
         }
+    }
+    ProviderType.TAVUNO -> {
+        "Tavuno replay depends on server support."
     }
 }

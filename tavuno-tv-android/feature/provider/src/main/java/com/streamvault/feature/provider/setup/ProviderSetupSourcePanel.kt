@@ -99,6 +99,15 @@ internal fun SourceTypeSelectorPanel(
                     onClick = { onSelect(SourceType.JELLYFIN) }
                 )
             }
+            if (!isEditing || sourceType == SourceType.TAVUNO) {
+                SourceTypeCard(
+                    title = "Tavuno",
+                    subtitle = "Tavuno TV platform",
+                    selected = sourceType == SourceType.TAVUNO,
+                    enabled = !isEditing,
+                    onClick = { onSelect(SourceType.TAVUNO) }
+                )
+            }
             if (!isEditing) {
                 ImportOptionsButton(
                     text = stringResource(R.string.settings_restore_data),

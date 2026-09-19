@@ -35,6 +35,7 @@ internal fun decodeProviderConfigurationCompat(
         ProviderType.M3U -> gson.fromJson(payload, M3uConfig::class.java)
         ProviderType.STALKER_PORTAL -> gson.fromJson(payload, StalkerConfig::class.java)
         ProviderType.JELLYFIN -> gson.fromJson(payload, JellyfinConfig::class.java)
+        ProviderType.TAVUNO -> throw UnsupportedOperationException("Tavuno provider configuration not yet implemented")
     } ?: throw IllegalArgumentException("Provider configuration payload is empty")
 
     // The 1.0.17 typed-provider backfill stored provider_configs.type separately but omitted

@@ -74,6 +74,7 @@ fun Provider.toTypedConfiguration(): ProviderConfiguration = when (type) {
         username = username,
         credential = password
     )
+    ProviderType.TAVUNO -> throw UnsupportedOperationException("Tavuno provider configuration not yet implemented")
 }
 
 fun Provider.toAccountRuntime() = ProviderAccountRuntime(

@@ -331,6 +331,7 @@ fun ProviderSetupScreen(
         selectedTab == 0 -> SourceType.XTREAM
         selectedTab == 1 -> SourceType.STALKER
         selectedTab == 3 -> SourceType.JELLYFIN
+        selectedTab == 4 -> SourceType.TAVUNO
         uiState.m3uTab == 1 -> SourceType.M3U_FILE
         else -> SourceType.M3U_URL
     }
@@ -359,6 +360,10 @@ fun ProviderSetupScreen(
             SourceType.JELLYFIN -> {
                 selectedTab = 3
                 viewModel.applySourceDefaults(ProviderSetupViewModel.SetupSourceType.JELLYFIN)
+            }
+            SourceType.TAVUNO -> {
+                selectedTab = 4
+                viewModel.applySourceDefaults(ProviderSetupViewModel.SetupSourceType.TAVUNO)
             }
         }
     }

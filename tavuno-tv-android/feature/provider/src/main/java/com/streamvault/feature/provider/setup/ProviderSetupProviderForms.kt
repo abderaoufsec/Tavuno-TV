@@ -258,6 +258,13 @@ internal fun ProviderFormContent(
                     onQuickConnectRequest = onQuickConnectRequest,
                     onLogin = onLoginJellyfin
                 )
+                SourceType.TAVUNO -> TavunoProviderForm(
+                    serverUrl = serverUrl,
+                    onServerUrlChange = onServerUrlChange,
+                    onTestConnection = { /* TODO: Implement Tavuno health check */ },
+                    testResult = null,
+                    isEditing = uiState.isEditing
+                )
             }
         }
     }
