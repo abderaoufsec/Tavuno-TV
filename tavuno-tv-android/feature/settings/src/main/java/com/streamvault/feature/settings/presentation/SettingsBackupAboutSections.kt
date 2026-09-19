@@ -566,4 +566,11 @@ public fun LazyListScope.settingsAboutSection(
                 modifier = if (targetItemId == "about.close_app") targetFocusModifier else Modifier,)
         }
     }
+
+    if (page == SettingsPage.ATTRIBUTION) item {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            SettingsRow(label = "Tavuno TV", value = stringResource(R.string.settings_about_attribution))
+            SettingsRow(label = "Source", value = stringResource(R.string.settings_about_attribution_link))
+        }
+    }
 }

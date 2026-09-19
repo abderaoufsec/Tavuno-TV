@@ -50,5 +50,6 @@ enum class SettingsPage(val categoryId: Int, val title: Int, val description: In
     VOD_PLAYBACK(8, R.string.settings_page_vod_playback, R.string.settings_page_vod_playback_description),
     APPEARANCE(9, R.string.settings_page_appearance, R.string.settings_page_appearance_description),
     HOME(9, R.string.settings_page_home, R.string.settings_page_home_description),
-    REMOTE(9, R.string.settings_remote_shortcuts_title, R.string.settings_page_remote_description);
+    REMOTE(9, R.string.settings_remote_shortcuts_title, R.string.settings_page_remote_description),
+    ATTRIBUTION(7, R.string.settings_page_attribution, R.string.settings_page_attribution_description);
 }
