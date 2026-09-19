@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .config import get_settings
-from .playback import authorize_live_playback, heartbeat_session, stop_session, get_profile_from_token, generate_auth_token
+from .playback import authorize_live_playback, heartbeat_session, stop_session, get_profile_from_token, generate_auth_token, verify_playback_token
 from .services import Services
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
@@ -310,9 +310,12 @@ def playback_live(
     channel_id: int,
     payload: LivePlaybackRequest,
     services: ServicesDependency,
-    authorization: str = Header(...),
+    authorization: str | None = Header(None),
 ) -> dict[str, Any]:
     """Authorize a live playback stream with JWT authentication (M7)."""
+    if not authorization:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
+    
     try:
         auth_data = get_profile_from_token(authorization)
         profile_id = auth_data["profile_id"]
@@ -368,8 +371,11 @@ def playback_stop(
 
 
 @app.post("/v1/admin/sync/dispatcharr", tags=["admin"])
-def sync_from_dispatcharr(services: ServicesDependency, authorization: str = Header(...)) -> dict[str, Any]:
+def sync_from_dispatcharr(services: ServicesDependency, authorization: str | None = Header(None)) -> dict[str, Any]:
     """Synchronize channels, VOD, stream mappings, and EPG from Dispatcharr (M4)."""
+    if not authorization:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
+    
     # Simple admin check - in production, use proper admin roles
     try:
         auth_data = get_profile_from_token(authorization)
@@ -397,6 +403,19 @@ def last_dispatcharr_sync(services: ServicesDependency) -> dict[str, Any]:
     if summary is None:
         return {"status": "never", "detail": "No Dispatcharr sync has been recorded yet"}
     return summary
+
+
+@app.get("/v1/media/verify", tags=["media"])
+def verify_media_token(token: str, services: ServicesDependency) -> dict[str, Any]:
+    """Verify a playback token for media-layer authorization (M7)."""
+    with database(services) as connection:
+        session_info = verify_playback_token(token, connection, services.settings.playback_token_secret)
+        return {
+            "valid": True,
+            "session_id": session_info["session_id"],
+            "profile_id": session_info["profile_id"],
+            "device_id": session_info["device_id"],
+        }
 
 
 @app.get("/v1/dispatcharr/health", tags=["operations"])

@@ -331,12 +331,17 @@ class SyncService:
             stream_id = _int(stream.get("id"))
             if stream_id is None:
                 continue
+            # Skip streams with missing required fields
+            if not stream.get("url") and not stream.get("source"):
+                logger.debug("Skipping stream %s: missing URL/source", stream_id)
+                continue
             for dispatcharr_channel_id in _stream_dispatcharr_channel_ids(stream):
                 tavuno_channel_id = channel_map.get(str(dispatcharr_channel_id))
                 if tavuno_channel_id is None:
                     continue
                 if self._ensure_source(connection, tavuno_channel_id, "dispatcharr-stream", str(stream_id), 10):
                     synced += 1
+        logger.info("Stream mappings sync: %d mappings processed", synced)
         return synced
 
     def sync_epg(self, connection: Any) -> int:

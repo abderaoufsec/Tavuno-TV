@@ -102,7 +102,7 @@ services:
 
 
   dispatcharr:
-    image: ghcr.io/dispatcharr/dispatcharr:0.27.2
+    image: ghcr.io/dispatcharr/dispatcharr:0.28.0
     container_name: tavuno-dispatcharr
     restart: unless-stopped
 
@@ -138,7 +138,7 @@ services:
 
 
   dispatcharr-celery:
-    image: ghcr.io/dispatcharr/dispatcharr:0.27.2
+    image: ghcr.io/dispatcharr/dispatcharr:0.28.0
     container_name: tavuno-dispatcharr-celery
     restart: unless-stopped
 
@@ -296,7 +296,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       DISPATCHARR_URL: http://dispatcharr:9191
       DISPATCHARR_API_KEY: ${DISPATCHARR_API_KEY:-}
-      DISPATCHARR_EXPECTED_VERSION: ${DISPATCHARR_EXPECTED_VERSION:-0.27.2}
+      DISPATCHARR_EXPECTED_VERSION: ${DISPATCHARR_EXPECTED_VERSION:-0.28.0}
       DISPATCHARR_SYNC_INTERVAL_SECONDS: ${DISPATCHARR_SYNC_INTERVAL_SECONDS:-3600}
       DISPATCHARR_TIMEOUT_SECONDS: ${DISPATCHARR_TIMEOUT_SECONDS:-20}
       OME_API_URL: http://tavuno-ovenmediaengine:8081

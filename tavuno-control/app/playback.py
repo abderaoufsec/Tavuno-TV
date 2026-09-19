@@ -49,6 +49,65 @@ def get_profile_from_token(authorization: str = Header(...)) -> dict[str, Any]:
     }
 
 
+def verify_playback_token(token: str, connection: Any, secret: str) -> dict[str, Any]:
+    """Verify a playback token and return session info."""
+    if not token or "." not in token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
+    
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
+    
+    try:
+        session_id = int(parts[0])
+        expires_at = int(parts[1])
+        signature = parts[2]
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
+    
+    # Check expiration
+    if int(time.time()) > expires_at:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    
+    # Verify signature
+    payload = f"{session_id}:unknown:live:unknown:{expires_at}"
+    expected_signature = hmac.new(
+        secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+    ).hexdigest()[:32]
+    
+    # For security, we need the full payload including device_id and content_key
+    # So we look up the session and verify
+    session = connection.execute(
+        """
+        SELECT id, profile, device, content_type, content_key, status, expires_at
+        FROM tavuno_playback_sessions
+        WHERE id = %s AND status = 'active' AND expires_at > NOW()
+        """,
+        (session_id,),
+    ).fetchone()
+    
+    if not session:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session not found or expired")
+    
+    # Verify signature with actual session data
+    actual_payload = f"{session_id}:{session['device']}:{session['content_type']}:{session['content_key']}:{expires_at}"
+    actual_signature = hmac.new(
+        secret.encode("utf-8"), actual_payload.encode("utf-8"), hashlib.sha256
+    ).hexdigest()[:32]
+    
+    if signature != actual_signature:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token signature")
+    
+    return {
+        "session_id": session["id"],
+        "profile_id": session["profile"],
+        "device_id": session["device"],
+        "content_type": session["content_type"],
+        "content_key": session["content_key"],
+        "status": session["status"],
+    }
+
+
 def mint_token(
     session_id: int,
     device_id: int,
@@ -132,17 +191,32 @@ def authorize_live_playback(
         (profile_id,),
     ).fetchone()
     
-    if device_count and device_count["count"] >= max_devices:
-        # Allow current device if already registered
-        current_device = connection.execute(
-            "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s",
-            (device_key, profile_id),
+    # Check if this specific device is already registered
+    current_device = connection.execute(
+        "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+        (device_key, profile_id),
+    ).fetchone()
+    
+    # If device not registered and at device limit, block
+    if not current_device and device_count and device_count["count"] >= max_devices:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Device limit reached ({max_devices} devices). Register this device first.",
+        )
+    
+    # Auto-register device if not registered but under limit
+    if not current_device:
+        device_row = connection.execute(
+            """
+            INSERT INTO tavuno_devices (profile, name, device_key, platform, is_active, last_seen_at)
+            VALUES (%s, 'Auto-registered Device', %s, 'unknown', TRUE, NOW())
+            RETURNING id
+            """,
+            (profile_id, device_key),
         ).fetchone()
-        if not current_device:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Device limit reached ({max_devices} devices)",
-            )
+        device_id = device_row["id"]
+    else:
+        device_id = current_device["id"]
 
     # 4. Enforce concurrent stream limit
     active_sessions = connection.execute(
@@ -209,7 +283,7 @@ def authorize_live_playback(
         VALUES (%s, %s, 'live', %s, 'active', NOW() + (%s || ' seconds')::interval, NOW())
         RETURNING id, expires_at
         """,
-        (profile_id, device["id"], str(channel_id), ttl),
+        (profile_id, device_id, str(channel_id), ttl),
     ).fetchone()
     connection.commit()
 
@@ -220,7 +294,7 @@ def authorize_live_playback(
     # 7. Mint token
     token = mint_token(
         session_id=session_id,
-        device_id=device["id"],
+        device_id=device_id,
         content_type="live",
         content_key=str(channel_id),
         expires_at=expires_ts,
@@ -255,6 +329,16 @@ def heartbeat_session(session_id: int, connection: Any, ttl_seconds: int = 120) 
     ).fetchone()
 
     if not row:
+        # Check if session exists but is stopped/expired
+        existing = connection.execute(
+            "SELECT id, status FROM tavuno_playback_sessions WHERE id = %s",
+            (session_id,),
+        ).fetchone()
+        if existing and existing["status"] == "stopped":
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="Playback session has been stopped",
+            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Active playback session not found or expired",
