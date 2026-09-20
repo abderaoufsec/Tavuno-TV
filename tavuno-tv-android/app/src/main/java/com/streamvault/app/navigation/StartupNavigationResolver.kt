@@ -132,6 +132,7 @@ class StartupNavigationResolver @Inject constructor(
 }
 
 private fun AppLandingDestination.toAppDestination(): AppDestination = when (this) {
+    AppLandingDestination.TAVUNO_HOME -> AppDestination.TavunoHome
     AppLandingDestination.HOME -> AppDestination.Home
     AppLandingDestination.LIVE_TV,
     AppLandingDestination.FIRST_FAVORITE_LIVE,

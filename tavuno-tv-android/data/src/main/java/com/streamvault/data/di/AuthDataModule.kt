@@ -4,6 +4,7 @@ import com.streamvault.data.preferences.TokenStore
 import com.streamvault.data.remote.tavuno.AuthRepositoryImpl
 import com.streamvault.data.remote.tavuno.TavunoApiService
 import com.streamvault.data.remote.tavuno.TavunoAuthInterceptor
+import com.streamvault.data.remote.tavuno.TavunoCatalogRepository
 import com.streamvault.data.util.DeviceFingerprintGenerator
 import com.streamvault.domain.repository.AuthRepository
 import dagger.Binds
@@ -71,6 +72,15 @@ abstract class AuthDataModule {
                 .build()
 
             return retrofit.create(TavunoApiService::class.java)
+        }
+
+        @Provides
+        @Singleton
+        fun provideTavunoCatalogRepository(
+            tavunoApiService: TavunoApiService,
+            tokenStore: TokenStore
+        ): TavunoCatalogRepository {
+            return TavunoCatalogRepository(tavunoApiService, tokenStore)
         }
     }
 }

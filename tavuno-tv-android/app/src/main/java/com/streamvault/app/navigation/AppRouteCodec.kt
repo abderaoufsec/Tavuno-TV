@@ -14,6 +14,7 @@ internal object AppRoutePatterns {
     const val WELCOME = SystemRoutePatterns.WELCOME
     const val LOGIN = "login"
     const val HOME = CatalogRoutePatterns.HOME
+    const val TAVUNO_HOME = CatalogRoutePatterns.TAVUNO_HOME
     const val LIVE_TV = LiveRoutePatterns.LIVE_TV
     const val LIVE_TV_DESTINATION = LiveRoutePatterns.LIVE_TV_DESTINATION
     const val MOVIES = CatalogRoutePatterns.MOVIES
@@ -40,6 +41,7 @@ internal object AppRouteCodec {
         AppDestination.Welcome -> AppRoutePatterns.WELCOME
         AppDestination.Login -> AppRoutePatterns.LOGIN
         AppDestination.Home -> AppRoutePatterns.HOME
+        AppDestination.TavunoHome -> AppRoutePatterns.TAVUNO_HOME
         is AppDestination.LiveTv -> destination.categoryId?.let { categoryId ->
             "${AppRoutePatterns.LIVE_TV}?categoryId=$categoryId"
         } ?: AppRoutePatterns.LIVE_TV
@@ -89,6 +91,7 @@ internal object AppRouteCodec {
             path == AppRoutePatterns.WELCOME -> AppDestination.Welcome
             path == AppRoutePatterns.LOGIN -> AppDestination.Login
             path == AppRoutePatterns.HOME -> AppDestination.Home
+            path == AppRoutePatterns.TAVUNO_HOME -> AppDestination.TavunoHome
             path == AppRoutePatterns.LIVE_TV -> {
                 when {
                     !query.containsKey("categoryId") -> AppDestination.LiveTv()
@@ -181,6 +184,7 @@ internal object AppRouteCodec {
 internal object Routes {
     const val PROVIDER_SETUP = AppRoutePatterns.PROVIDER_SETUP
     const val HOME = AppRoutePatterns.HOME
+    const val TAVUNO_HOME = AppRoutePatterns.TAVUNO_HOME
     const val LIVE_TV = AppRoutePatterns.LIVE_TV
     const val LIVE_TV_DESTINATION = AppRoutePatterns.LIVE_TV_DESTINATION
     const val MOVIES = AppRoutePatterns.MOVIES

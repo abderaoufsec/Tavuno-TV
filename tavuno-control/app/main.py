@@ -14,14 +14,10 @@ from .services import Services
 from .auth.router import router as auth_router
 from .devices.router import router as devices_router
 from .auth.service import AuthService
+from .catalog.service import CatalogService
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("tavuno-control")
-
-CATALOG_COLLECTIONS = {
-    "movies": "tavuno_movies",
-    "series": "tavuno_series",
-}
 
 JWT_EXPIRATION_HOURS = 24
 
@@ -111,40 +107,26 @@ def health(services: ServicesDependency) -> dict[str, Any]:
 
 @app.get("/v1/home", tags=["catalog"])
 def home(services: ServicesDependency) -> dict[str, Any]:
-    def load() -> dict[str, Any]:
-        with database(services) as connection:
-            categories = connection.execute(
-                "SELECT id, name, kind FROM tavuno_categories WHERE is_active = TRUE ORDER BY sort_order, name LIMIT 12"
-            ).fetchall()
-            channels = connection.execute(
-                "SELECT id, name, slug FROM tavuno_channels WHERE is_active = TRUE ORDER BY name LIMIT 12"
-            ).fetchall()
-        return {"categories": categories, "featured_channels": channels}
-
-    return services.cached_json("home", load)
+    catalog = CatalogService(services)
+    return catalog.get_home()
 
 
 @app.get("/v1/channels", tags=["catalog"])
 def list_channels(services: ServicesDependency, category_id: int | None = None) -> list[dict[str, Any]]:
-    query = "SELECT id, name, slug, category, is_active FROM tavuno_channels WHERE is_active = TRUE"
-    parameters: tuple[Any, ...] = ()
-    if category_id is not None:
-        query += " AND category = %s"
-        parameters = (category_id,)
-    query += " ORDER BY name"
-    with database(services) as connection:
-        return connection.execute(query, parameters).fetchall()
+    catalog = CatalogService(services)
+    channels = catalog.get_channels(category_id=category_id)
+    return [channel.model_dump() for channel in channels]
 
 
 @app.get("/v1/channels/{channel_id}", tags=["catalog"])
 def get_channel(channel_id: int, services: ServicesDependency) -> dict[str, Any]:
+    catalog = CatalogService(services)
+    channel = catalog.get_channel(channel_id)
+    if channel is None:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    # Get sources separately (not in catalog model)
     with database(services) as connection:
-        channel = connection.execute(
-            "SELECT id, name, slug, category, is_active FROM tavuno_channels WHERE id = %s AND is_active = TRUE",
-            (channel_id,),
-        ).fetchone()
-        if channel is None:
-            raise HTTPException(status_code=404, detail="Channel not found")
         sources = connection.execute(
             """
             SELECT provider, external_id, priority, is_active
@@ -154,8 +136,20 @@ def get_channel(channel_id: int, services: ServicesDependency) -> dict[str, Any]
             """,
             (channel_id,),
         ).fetchall()
-    channel["sources"] = sources
-    return channel
+
+    channel_data = channel.model_dump()
+    channel_data["sources"] = sources
+    return channel_data
+
+
+@app.get("/v1/channels/{channel_id}/details", tags=["catalog"])
+def get_channel_details(channel_id: int, services: ServicesDependency) -> dict[str, Any]:
+    """Get detailed channel information for content detail screens (M12)."""
+    catalog = CatalogService(services)
+    channel_details = catalog.get_channel_details(channel_id)
+    if channel_details is None:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    return channel_details.model_dump()
 
 
 class DeviceRegistration(BaseModel):
@@ -212,36 +206,79 @@ def epg(services: ServicesDependency, channel_id: int | None = None) -> list[dic
     return programmes
 
 
-def list_catalog(collection_key: str, services: Services, category_id: int | None = None) -> list[dict[str, Any]]:
-    collection = CATALOG_COLLECTIONS.get(collection_key)
-    if collection is None:
-        raise HTTPException(status_code=400, detail="Unknown catalog collection")
-    query = f"SELECT id, title, slug, category FROM {collection} WHERE is_active = TRUE"
-    parameters: tuple[Any, ...] = ()
-    if category_id is not None:
-        query += " AND category = %s"
-        parameters = (category_id,)
-    query += " ORDER BY title"
-    with database(services) as connection:
-        return connection.execute(query, parameters).fetchall()
+@app.get("/v1/categories", tags=["catalog"])
+def list_categories(services: ServicesDependency, kind: str | None = None) -> list[dict[str, Any]]:
+    catalog = CatalogService(services)
+    categories = catalog.get_categories(kind=kind)
+    return [category.model_dump() for category in categories]
+
+
+@app.get("/v1/categories/{category_id}", tags=["catalog"])
+def get_category(category_id: int, services: ServicesDependency) -> dict[str, Any]:
+    catalog = CatalogService(services)
+    category = catalog.get_category(category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return category.model_dump()
 
 
 @app.get("/v1/movies", tags=["catalog"])
 def movies(services: ServicesDependency, category_id: int | None = None) -> list[dict[str, Any]]:
-    return list_catalog("movies", services, category_id)
+    catalog = CatalogService(services)
+    movies = catalog.get_movies(category_id=category_id)
+    return [movie.model_dump() for movie in movies]
+
+
+@app.get("/v1/movies/{movie_id}", tags=["catalog"])
+def get_movie(movie_id: int, services: ServicesDependency) -> dict[str, Any]:
+    catalog = CatalogService(services)
+    movie = catalog.get_movie(movie_id)
+    if movie is None:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movie.model_dump()
+
+
+@app.get("/v1/movies/{movie_id}/details", tags=["catalog"])
+def get_movie_details(movie_id: int, services: ServicesDependency) -> dict[str, Any]:
+    """Get detailed movie information for content detail screens (M12)."""
+    catalog = CatalogService(services)
+    movie_details = catalog.get_movie_details(movie_id)
+    if movie_details is None:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movie_details.model_dump()
 
 
 @app.get("/v1/series", tags=["catalog"])
 def series(services: ServicesDependency, category_id: int | None = None) -> list[dict[str, Any]]:
-    return list_catalog("series", services, category_id)
+    catalog = CatalogService(services)
+    series_list = catalog.get_series(category_id=category_id)
+    return [series_item.model_dump() for series_item in series_list]
+
+
+@app.get("/v1/series/{series_id}", tags=["catalog"])
+def get_series(series_id: int, services: ServicesDependency) -> dict[str, Any]:
+    catalog = CatalogService(services)
+    series_item = catalog.get_series_by_id(series_id)
+    if series_item is None:
+        raise HTTPException(status_code=404, detail="Series not found")
+    return series_item.model_dump()
+
+
+@app.get("/v1/series/{series_id}/details", tags=["catalog"])
+def get_series_details(series_id: int, services: ServicesDependency) -> dict[str, Any]:
+    """Get detailed series information for content detail screens (M12)."""
+    catalog = CatalogService(services)
+    series_details = catalog.get_series_details(series_id)
+    if series_details is None:
+        raise HTTPException(status_code=404, detail="Series not found")
+    return series_details.model_dump()
 
 
 @app.get("/v1/sports", tags=["catalog"])
 def sports(services: ServicesDependency) -> list[dict[str, Any]]:
-    with database(services) as connection:
-        return connection.execute(
-            "SELECT id, name, kind FROM tavuno_categories WHERE is_active = TRUE AND kind = 'sports' ORDER BY sort_order, name"
-        ).fetchall()
+    catalog = CatalogService(services)
+    categories = catalog.get_categories(kind="sports")
+    return [category.model_dump() for category in categories]
 
 
 @app.get("/v1/epg/channel/{channel_id}/now-next", tags=["epg"])

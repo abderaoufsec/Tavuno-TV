@@ -26,6 +26,7 @@ import com.streamvault.domain.manager.ParentalPinVerifier
 import com.streamvault.domain.manager.ProviderSetupInputValidator
 import com.streamvault.domain.manager.ProviderSyncStateReader
 import com.streamvault.data.repository.*
+import com.streamvault.domain.repository.UnifiedCatalogRepository
 import com.streamvault.domain.manager.ParentalControlSessionStore
 import com.streamvault.domain.repository.*
 import com.streamvault.domain.manager.BackupRestoreStatusStore
@@ -76,6 +77,9 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindSearchRepository(impl: SearchRepositoryImpl): SearchRepository
+
+    @Binds @Singleton
+    abstract fun bindUnifiedCatalogRepository(impl: UnifiedCatalogRepositoryImpl): UnifiedCatalogRepository
 
     @Binds @Singleton
     abstract fun bindEpgRepository(impl: EpgRepositoryImpl): EpgRepository

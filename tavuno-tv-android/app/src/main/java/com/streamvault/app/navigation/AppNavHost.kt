@@ -64,7 +64,7 @@ internal fun AppNavHost(
         composable("login") {
             LoginScreen(
                 onSuccess = dropUnlessResumed {
-                    onStartupNavigationRequested(AppDestination.Home)
+                    onStartupNavigationRequested(AppDestination.TavunoHome)
                 }
             )
         }

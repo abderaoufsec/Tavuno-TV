@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import com.streamvault.core.navigation.AppDestination
 import com.streamvault.core.navigation.ExternalNavigationRequest
 import com.streamvault.data.preferences.PreferencesRepository
+import com.streamvault.data.preferences.TokenStore
 import com.streamvault.domain.model.ActiveLiveSource
 import com.streamvault.domain.model.AppLandingDestination
 import com.streamvault.domain.model.AppTopLevelDestination
@@ -225,11 +226,14 @@ class AppNavigationCoordinatorTest {
             channelRepository = channelRepository,
             providerRepository = providerRepository
         )
+        val tokenStore = mock<TokenStore>()
+        whenever(tokenStore.getAccessToken()).thenReturn("mock_token")
         return AppNavigationCoordinator(
             commandIds = ids,
             startupResolver = startupResolver,
             preferencesRepository = preferencesRepository,
-            providerRepository = providerRepository
+            providerRepository = providerRepository,
+            tokenStore = tokenStore
         )
     }
 }

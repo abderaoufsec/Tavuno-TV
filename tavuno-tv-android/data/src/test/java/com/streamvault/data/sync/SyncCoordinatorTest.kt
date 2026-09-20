@@ -211,6 +211,16 @@ class SyncCoordinatorTest {
                 guide = { ProviderGuideSyncResult(emptyList(), false) }
             )
         )
+        ProviderType.TAVUNO -> XtreamCatalogSyncPlan(
+            XtreamCatalogSyncOperations(
+                full = { outcome },
+                live = { outcome },
+                epg = { },
+                movies = { outcome },
+                series = { outcome },
+                guide = { ProviderGuideSyncResult(emptyList(), false) }
+            )
+        )
     }
 
     private fun fullRequest(snapshot: ProviderSnapshot) = FullProviderSyncRequest(
@@ -237,6 +247,7 @@ class SyncCoordinatorTest {
         ProviderType.M3U -> listOf(SyncRepairSection.LIVE, SyncRepairSection.MOVIES)
         ProviderType.STALKER_PORTAL -> listOf(SyncRepairSection.LIVE, SyncRepairSection.MOVIES, SyncRepairSection.SERIES)
         ProviderType.JELLYFIN -> listOf(SyncRepairSection.MOVIES, SyncRepairSection.SERIES)
+        ProviderType.TAVUNO -> listOf(SyncRepairSection.LIVE, SyncRepairSection.MOVIES, SyncRepairSection.SERIES)
     }
 
     private fun repairSections(type: ProviderType): List<SyncRepairSection> = when (type) {
@@ -254,6 +265,7 @@ class SyncCoordinatorTest {
             SyncRepairSection.EPG
         )
         ProviderType.JELLYFIN -> listOf(SyncRepairSection.MOVIES, SyncRepairSection.SERIES)
+        ProviderType.TAVUNO -> listOf(SyncRepairSection.LIVE, SyncRepairSection.MOVIES, SyncRepairSection.SERIES)
     }
 
     private fun planFor(type: ProviderType, fullResult: SyncOutcome) = LambdaCatalogSyncPlan(
@@ -272,6 +284,7 @@ class SyncCoordinatorTest {
                 device = StalkerDeviceIdentity("00:11:22:33:44:55")
             )
             ProviderType.JELLYFIN -> JellyfinConfig("https://example.com", "user", "token")
+            ProviderType.TAVUNO -> XtreamConfig("https://example.com", "user", "pass") // Placeholder for test
         }
         return ProviderSnapshot(
             provider = Provider(id = 1L, name = "Test", type = type),

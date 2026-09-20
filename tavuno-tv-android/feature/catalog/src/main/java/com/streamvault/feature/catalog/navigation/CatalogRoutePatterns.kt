@@ -2,6 +2,7 @@ package com.streamvault.feature.catalog.navigation
 
 object CatalogRoutePatterns {
     const val HOME = "home"
+    const val TAVUNO_HOME = "tavuno_home"
     const val MOVIES = "movies"
     const val SERIES = "series"
     const val VOD = "vod"

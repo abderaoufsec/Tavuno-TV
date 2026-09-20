@@ -126,6 +126,7 @@ internal fun rememberAppDestinationItems(
 }
 
 private fun AppTopLevelDestination.toDestinationItem(): AppDestinationItem = when (this) {
+    AppTopLevelDestination.TAVUNO_HOME -> AppDestinationItem(Routes.TAVUNO_HOME, R.string.nav_home, Icons.Default.Home)
     AppTopLevelDestination.HOME -> AppDestinationItem(Routes.HOME, R.string.nav_home, Icons.Default.Home)
     AppTopLevelDestination.LIVE_TV -> AppDestinationItem(Routes.LIVE_TV, R.string.nav_live_tv, Icons.Default.PlayArrow)
     AppTopLevelDestination.MOVIES -> AppDestinationItem(Routes.MOVIES, R.string.nav_movies, Icons.Default.Star)

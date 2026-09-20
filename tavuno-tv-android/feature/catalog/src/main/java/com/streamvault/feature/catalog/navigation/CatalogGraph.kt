@@ -23,6 +23,7 @@ import com.streamvault.feature.catalog.presentation.movies.MoviesScreen
 import com.streamvault.feature.catalog.presentation.search.SearchScreen
 import com.streamvault.feature.catalog.presentation.series.SeriesDetailScreen
 import com.streamvault.feature.catalog.presentation.series.SeriesScreen
+import com.streamvault.feature.catalog.presentation.tavuno.TavunoHomeScreen
 import com.streamvault.feature.catalog.presentation.vod.VodScreen
 
 /**
@@ -78,6 +79,32 @@ fun NavGraphBuilder.registerCatalogGraph(
             onPlaybackHistoryClick = { history -> onPlayHistory(history, AppDestination.Home) },
             scaffold = scaffold,
             dashboardShelfCustomizationContent = dashboardShelfCustomizationContent,
+        )
+    }
+
+    composable(CatalogRoutePatterns.TAVUNO_HOME) {
+        TavunoHomeScreen(
+            onChannelSelected = { channel ->
+                onPlayChannel(
+                    channel,
+                    CatalogChannelPlaybackContext(
+                        categoryId = channel.categoryId,
+                        providerId = -1L, // Tavuno doesn't use providerId
+                        isVirtual = false,
+                        combinedProfileId = null,
+                        returnDestination = AppDestination.TavunoHome,
+                    )
+                )
+            },
+            onCategorySelected = { categoryId ->
+                // TODO: Navigate to category detail
+            },
+            onMovieSelected = { movie ->
+                onOpenMovieDetail(movie, AppDestination.TavunoHome)
+            },
+            onSeriesSelected = { series ->
+                onOpenSeriesDetail(series, AppDestination.TavunoHome)
+            }
         )
     }
 

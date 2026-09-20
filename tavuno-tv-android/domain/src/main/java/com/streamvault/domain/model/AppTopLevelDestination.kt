@@ -6,6 +6,7 @@ enum class AppTopLevelDestination(
     val isRequired: Boolean = false
 ) {
     HOME("home", AppLandingDestination.HOME),
+    TAVUNO_HOME("tavuno_home", AppLandingDestination.HOME),
     LIVE_TV("live_tv", AppLandingDestination.LIVE_TV),
     MOVIES("movies", AppLandingDestination.MOVIES),
     SERIES("series", AppLandingDestination.SERIES),
@@ -17,6 +18,7 @@ enum class AppTopLevelDestination(
 
     companion object {
         val defaultOrder: List<AppTopLevelDestination> = listOf(
+            TAVUNO_HOME,
             HOME,
             LIVE_TV,
             MOVIES,

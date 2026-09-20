@@ -15,7 +15,7 @@ The service:
 from typing import Optional, List
 from contextlib import contextmanager
 
-from .models import Channel, Category, Movie, Series
+from .models import Channel, Category, Movie, Series, ChannelDetails, MovieDetails, SeriesDetails
 
 
 class CatalogService:
@@ -276,13 +276,126 @@ class CatalogService:
         """
         with self._db() as conn:
             categories = conn.execute(
-                "SELECT id, name, kind FROM tavuno_categories WHERE is_active = TRUE ORDER BY sort_order, name LIMIT 12"
+                "SELECT id, name, kind, parent, sort_order, is_active FROM tavuno_categories WHERE is_active = TRUE ORDER BY sort_order, name LIMIT 12"
             ).fetchall()
             channels = conn.execute(
-                "SELECT id, name, slug FROM tavuno_channels WHERE is_active = TRUE ORDER BY name LIMIT 12"
+                "SELECT id, name, slug, category, logo, is_active FROM tavuno_channels WHERE is_active = TRUE ORDER BY name LIMIT 12"
             ).fetchall()
         
         return {
             "categories": [self._map_category(row) for row in categories],
             "featured_channels": [self._map_channel(row) for row in channels],
         }
+
+    def get_channel_details(self, channel_id: int) -> Optional[ChannelDetails]:
+        """Get detailed channel information for content detail screens (M12).
+
+        Args:
+            channel_id: Channel ID
+
+        Returns:
+            ChannelDetails model or None if not found
+        """
+        with self._db() as conn:
+            row = conn.execute(
+                """
+                SELECT c.id, c.name, c.slug, c.category, c.logo, c.is_active, cat.name as category_name
+                FROM tavuno_channels c
+                LEFT JOIN tavuno_categories cat ON c.category = cat.id
+                WHERE c.id = %s AND c.is_active = TRUE
+                """,
+                (channel_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return ChannelDetails(
+            id=row["id"],
+            name=row["name"],
+            slug=row["slug"],
+            category_id=row.get("category"),
+            logo=str(row["logo"]) if row.get("logo") else None,
+            is_active=row["is_active"],
+            description=None,  # No description field in current schema
+            category_name=row.get("category_name"),
+            playback_available=True,  # Assume available if active
+        )
+
+    def get_movie_details(self, movie_id: int) -> Optional[MovieDetails]:
+        """Get detailed movie information for content detail screens (M12).
+
+        Args:
+            movie_id: Movie ID
+
+        Returns:
+            MovieDetails model or None if not found
+        """
+        with self._db() as conn:
+            row = conn.execute(
+                """
+                SELECT m.id, m.title, m.slug, m.category, m.synopsis, m.release_year, m.is_active, cat.name as category_name
+                FROM tavuno_movies m
+                LEFT JOIN tavuno_categories cat ON m.category = cat.id
+                WHERE m.id = %s AND m.is_active = TRUE
+                """,
+                (movie_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return MovieDetails(
+            id=row["id"],
+            title=row["title"],
+            slug=row["slug"],
+            category_id=row.get("category"),
+            synopsis=row.get("synopsis"),
+            release_year=row.get("release_year"),
+            is_active=row["is_active"],
+            poster=None,  # No poster field in current schema
+            backdrop=None,  # No backdrop field in current schema
+            duration=None,  # No duration field in current schema
+            category_name=row.get("category_name"),
+            genres=None,  # No genres field in current schema
+            playback_available=True,  # Assume available if active
+        )
+
+    def get_series_details(self, series_id: int) -> Optional[SeriesDetails]:
+        """Get detailed series information for content detail screens (M12).
+
+        Args:
+            series_id: Series ID
+
+        Returns:
+            SeriesDetails model or None if not found
+        """
+        with self._db() as conn:
+            row = conn.execute(
+                """
+                SELECT s.id, s.title, s.slug, s.category, s.synopsis, s.is_active, cat.name as category_name
+                FROM tavuno_series s
+                LEFT JOIN tavuno_categories cat ON s.category = cat.id
+                WHERE s.id = %s AND s.is_active = TRUE
+                """,
+                (series_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return SeriesDetails(
+            id=row["id"],
+            title=row["title"],
+            slug=row["slug"],
+            category_id=row.get("category"),
+            synopsis=row.get("synopsis"),
+            is_active=row["is_active"],
+            poster=None,  # No poster field in current schema
+            backdrop=None,  # No backdrop field in current schema
+            release_year=None,  # No release_year field in current schema
+            category_name=row.get("category_name"),
+            seasons=None,  # No seasons data in current schema
+            episode_count=None,  # No episode data in current schema
+            playback_available=True,  # Assume available if active
+        )

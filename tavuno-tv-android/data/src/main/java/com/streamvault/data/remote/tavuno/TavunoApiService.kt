@@ -7,9 +7,10 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
- * Tavuno Control API abstraction for authentication and device management.
+ * Tavuno Control API abstraction for authentication, device management, and catalog.
  */
 interface TavunoApiService {
     @POST("v1/auth/login")
@@ -26,4 +27,52 @@ interface TavunoApiService {
 
     @DELETE("v1/devices/{id}")
     suspend fun revokeDevice(@Path("id") deviceId: Int): Response<Unit>
+
+    // Catalog endpoints
+    @GET("v1/home")
+    suspend fun getHome(): Response<HomeResponse>
+
+    @GET("v1/channels")
+    suspend fun getChannels(@Query("category_id") categoryId: Int?): Response<List<ChannelDto>>
+
+    @GET("v1/channels/{id}")
+    suspend fun getChannel(@Path("id") channelId: Int): Response<ChannelDetailDto>
+
+    @GET("v1/categories")
+    suspend fun getCategories(@Query("kind") kind: String?): Response<List<CategoryDto>>
+
+    @GET("v1/categories/{id}")
+    suspend fun getCategory(@Path("id") categoryId: Int): Response<CategoryDto>
+
+    @GET("v1/movies")
+    suspend fun getMovies(@Query("category_id") categoryId: Int?): Response<List<MovieDto>>
+
+    @GET("v1/movies/{id}")
+    suspend fun getMovie(@Path("id") movieId: Int): Response<MovieDto>
+
+    @GET("v1/series")
+    suspend fun getSeries(@Query("category_id") categoryId: Int?): Response<List<SeriesDto>>
+
+    @GET("v1/series/{id}")
+    suspend fun getSeries(@Path("id") seriesId: Int): Response<SeriesDto>
+
+    @GET("v1/sports")
+    suspend fun getSports(): Response<List<CategoryDto>>
+
+    // Content detail endpoints (M12)
+    @GET("v1/channels/{id}/details")
+    suspend fun getChannelDetails(@Path("id") channelId: Int): Response<ChannelDetailsDto>
+
+    @GET("v1/movies/{id}/details")
+    suspend fun getMovieDetails(@Path("id") movieId: Int): Response<MovieDetailsDto>
+
+    @GET("v1/series/{id}/details")
+    suspend fun getSeriesDetails(@Path("id") seriesId: Int): Response<SeriesDetailsDto>
+
+    // Playback authorization endpoints (M12.5)
+    @POST("v1/playback/live/{channel_id}")
+    suspend fun authorizeLivePlayback(
+        @Path("channel_id") channelId: Int,
+        @Body request: PlaybackRequest
+    ): Response<PlaybackResponse>
 }

@@ -1,4 +1,4 @@
-"""Catalog domain models (M11).
+"""Catalog domain models (M11-M12).
 
 These models provide a normalized Tavuno API boundary between external providers
 (Dispatcharr) and clients (Android, web, etc.). They expose only the fields Tavuno
@@ -12,7 +12,7 @@ Database schema mapping:
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 
 class Channel(BaseModel):
@@ -66,3 +66,88 @@ class Series(BaseModel):
     category_id: Optional[int] = None
     synopsis: Optional[str] = None
     is_active: bool = True
+
+
+class ChannelDetails(BaseModel):
+    """Extended channel details for content detail screens (M12).
+
+    Includes additional metadata useful for channel detail views.
+    Extends the base Channel model with UI-relevant fields.
+    """
+    id: int
+    name: str
+    slug: str
+    category_id: Optional[int] = None
+    logo: Optional[str] = None
+    is_active: bool = True
+    description: Optional[str] = None
+    category_name: Optional[str] = None
+    playback_available: bool = True
+
+
+class MovieDetails(BaseModel):
+    """Extended movie details for content detail screens (M12).
+
+    Includes additional metadata useful for movie detail views.
+    Extends the base Movie model with UI-relevant fields.
+    """
+    id: int
+    title: str
+    slug: str
+    category_id: Optional[int] = None
+    synopsis: Optional[str] = None
+    release_year: Optional[int] = None
+    is_active: bool = True
+    poster: Optional[str] = None
+    backdrop: Optional[str] = None
+    duration: Optional[str] = None
+    category_name: Optional[str] = None
+    genres: Optional[List[str]] = None
+    playback_available: bool = True
+
+
+class SeriesDetails(BaseModel):
+    """Extended series details for content detail screens (M12).
+
+    Includes additional metadata useful for series detail views.
+    Extends the base Series model with UI-relevant fields.
+    """
+    id: int
+    title: str
+    slug: str
+    category_id: Optional[int] = None
+    synopsis: Optional[str] = None
+    is_active: bool = True
+    poster: Optional[str] = None
+    backdrop: Optional[str] = None
+    release_year: Optional[int] = None
+    category_name: Optional[str] = None
+    seasons: Optional[List[Dict[str, Any]]] = None
+    episode_count: Optional[int] = None
+    playback_available: bool = True
+
+
+class SeasonDetails(BaseModel):
+    """Season details for series content (M12).
+
+    Provides season-level information with episode metadata.
+    """
+    season_number: int
+    name: str
+    episode_count: int
+    episodes: Optional[List[Dict[str, Any]]] = None
+
+
+class EpisodeDetails(BaseModel):
+    """Episode details for series content (M12).
+
+    Provides episode-level information for playback.
+    """
+    id: int
+    title: str
+    season_number: int
+    episode_number: int
+    synopsis: Optional[str] = None
+    duration: Optional[str] = None
+    thumbnail: Optional[str] = None
+    playback_available: bool = True

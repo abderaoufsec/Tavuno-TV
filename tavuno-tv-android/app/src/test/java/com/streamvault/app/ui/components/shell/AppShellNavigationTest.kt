@@ -17,6 +17,7 @@ class AppShellNavigationTest {
 
         assertThat(result.map { it.route })
             .containsExactly(
+                Routes.TAVUNO_HOME,
                 Routes.HOME,
                 Routes.LIVE_TV,
                 Routes.MOVIES,
@@ -46,7 +47,7 @@ class AppShellNavigationTest {
     fun unifiedCatalogReplacesMovieAndSeriesWithOneVodDestination() {
         val result = buildDestinationItems(
             configured = listOf(
-                AppTopLevelDestination.HOME,
+                AppTopLevelDestination.TAVUNO_HOME,
                 AppTopLevelDestination.MOVIES,
                 AppTopLevelDestination.SERIES
             ),
@@ -54,7 +55,7 @@ class AppShellNavigationTest {
         )
 
         assertThat(result.map { it.route })
-            .containsExactly(Routes.HOME, Routes.VOD)
+            .containsExactly(Routes.TAVUNO_HOME, Routes.VOD)
             .inOrder()
     }
 }

@@ -53,6 +53,7 @@ class DefaultProviderCapabilityRegistryTest {
             ProviderType.M3U -> M3uConfig("https://m.test/list.m3u")
             ProviderType.STALKER_PORTAL -> StalkerConfig("https://s.test", StalkerDeviceIdentity("00:11:22:33:44:55"))
             ProviderType.JELLYFIN -> JellyfinConfig("https://j.test", "u", "t")
+            ProviderType.TAVUNO -> XtreamConfig("https://t.test", "u", "p") // Placeholder for test
         }
         return ProviderSnapshot(
             provider = StableProvider(name = type.name, type = type),

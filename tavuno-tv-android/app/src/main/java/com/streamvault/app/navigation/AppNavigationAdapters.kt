@@ -4,6 +4,7 @@ import com.streamvault.domain.model.AppLandingDestination
 import com.streamvault.domain.model.AppTopLevelDestination
 
 internal fun AppLandingDestination.toAppRoute(): String = when (this) {
+    AppLandingDestination.TAVUNO_HOME -> Routes.TAVUNO_HOME
     AppLandingDestination.HOME -> Routes.HOME
     AppLandingDestination.LIVE_TV -> Routes.LIVE_TV
     AppLandingDestination.FIRST_FAVORITE_LIVE -> Routes.LIVE_TV
@@ -17,6 +18,7 @@ internal fun AppLandingDestination.toAppRoute(): String = when (this) {
 }
 
 internal fun AppTopLevelDestination.toAppRoute(): String = when (this) {
+    AppTopLevelDestination.TAVUNO_HOME -> Routes.TAVUNO_HOME
     AppTopLevelDestination.HOME -> Routes.HOME
     AppTopLevelDestination.LIVE_TV -> Routes.LIVE_TV
     AppTopLevelDestination.MOVIES -> Routes.MOVIES

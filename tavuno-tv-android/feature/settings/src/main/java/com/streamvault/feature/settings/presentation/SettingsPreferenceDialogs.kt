@@ -385,6 +385,7 @@ public fun SettingsPreferenceDialogs(
 }
 
 private fun AppLandingDestination.labelResId(): Int = when (this) {
+    AppLandingDestination.TAVUNO_HOME -> R.string.nav_home
     AppLandingDestination.HOME -> R.string.nav_home
     AppLandingDestination.LIVE_TV -> R.string.nav_live_tv
     AppLandingDestination.FIRST_FAVORITE_LIVE -> R.string.settings_startup_first_favorite_live

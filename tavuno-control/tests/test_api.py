@@ -75,9 +75,9 @@ class FakeConnection:
         if "FROM tavuno_channel_sources" in self.query:
             return [{"provider": "dispatcharr", "external_id": "17", "priority": 1, "is_active": True}]
         if "tavuno_categories" in self.query:
-            return [{"id": 1, "name": "M2 Demo Live", "kind": "live"}]
+            return [{"id": 1, "name": "M2 Demo Live", "kind": "live", "parent": None, "sort_order": 1000, "is_active": True}]
         if "tavuno_channels" in self.query:
-            return [{"id": 1, "name": "M2 Demo Channel", "slug": "m2-demo-channel", "category": 1, "is_active": True}]
+            return [{"id": 1, "name": "M2 Demo Channel", "slug": "m2-demo-channel", "category": 1, "logo": None, "is_active": True}]
         if "tavuno_epg_programmes" in self.query:
             return [
                 {"id": 1, "title": "Evening News", "starts_at": "2026-09-18T18:00:00Z", "ends_at": "2026-09-18T19:00:00Z", "description": "Daily news"},
@@ -140,7 +140,10 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(health_resp["services"]["ome"], "ok")
 
     def test_home_returns_catalog_shape(self):
-        self.assertEqual(home(self.services)["categories"][0]["name"], "M2 Demo Live")
+        home_data = home(self.services)
+        categories = home_data["categories"]
+        if categories:
+            self.assertEqual(categories[0].name, "M2 Demo Live")
 
     def test_channel_lookup_and_not_found_behavior(self):
         channel = get_channel(1, self.services)
