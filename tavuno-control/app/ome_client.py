@@ -27,14 +27,15 @@ class OmeClient:
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/json"}
         if self.api_token:
-            headers["Authorization"] = self.api_token
+            # OME requires HTTP Basic Authentication with base64-encoded token
+            # Format: Authorization: Basic <base64_encode(token)>
+            encoded_token = base64.b64encode(self.api_token.encode("utf-8")).decode("utf-8")
+            headers["Authorization"] = f"Basic {encoded_token}"
         return headers
 
     def get_health(self) -> dict[str, Any]:
         """Probe OME API health."""
         url = f"{self.api_url}/v1/vhosts"
-        if self.api_token:
-            url = f"{url}?access_token={self.api_token}"
         try:
             with httpx.Client(timeout=self.timeout, headers=self._headers()) as client:
                 response = client.get(url)

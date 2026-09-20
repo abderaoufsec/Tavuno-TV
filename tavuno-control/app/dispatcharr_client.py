@@ -42,7 +42,6 @@ class DispatcharrClient:
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/json"}
         if self.api_key:
-            headers["Authorization"] = f"ApiKey {self.api_key}"
             headers["X-API-Key"] = self.api_key
         return headers
 

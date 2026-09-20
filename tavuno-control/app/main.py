@@ -9,10 +9,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .config import get_settings
-from .playback import authorize_live_playback, heartbeat_session, stop_session, get_profile_from_token, generate_auth_token, verify_playback_token
+from .playback import authorize_live_playback, heartbeat_session, stop_session, generate_auth_token, verify_playback_token
 from .services import Services
 from .auth.router import router as auth_router
 from .devices.router import router as devices_router
+from .auth.service import AuthService
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("tavuno-control")
@@ -322,8 +323,15 @@ def playback_live(
     if not authorization:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
     
+    # Extract Bearer token
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
+    token = authorization.replace("Bearer ", "")
+    
     try:
-        auth_data = get_profile_from_token(authorization)
+        # Use AuthService to verify token and get profile
+        auth_service = AuthService(services)
+        auth_data = auth_service.get_profile_from_token(token)
         profile_id = auth_data["profile_id"]
         device_id = auth_data["device_id"]
         
@@ -382,12 +390,31 @@ def sync_from_dispatcharr(services: ServicesDependency, authorization: str | Non
     if not authorization:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
     
-    # Simple admin check - in production, use proper admin roles
+    # Extract Bearer token
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
+    token = authorization.replace("Bearer ", "")
+    
     try:
-        auth_data = get_profile_from_token(authorization)
-        # In production, check if profile has admin role
+        # Use AuthService to verify token and get profile
+        auth_service = AuthService(services)
+        auth_data = auth_service.get_profile_from_token(token)
+        profile_id = auth_data["profile_id"]
+        
+        # Check if profile has admin role
+        if auth_data.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required"
+            )
     except HTTPException:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise
+    except Exception as exc:
+        logger.exception("Admin authorization check failed")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        ) from exc
     
     try:
         with database(services) as connection:

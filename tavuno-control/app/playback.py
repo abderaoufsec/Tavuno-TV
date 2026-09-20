@@ -35,12 +35,18 @@ def verify_auth_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
-def get_profile_from_token(authorization: str = Header(...)) -> dict[str, Any]:
+def get_profile_from_token(authorization: str | None = None) -> dict[str, Any]:
     """Extract and verify profile from Authorization header."""
-    if not authorization.startswith("Bearer "):
+    if authorization is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
+    
+    # Handle both FastAPI Header objects and raw strings
+    auth_value = str(authorization) if not isinstance(authorization, str) else authorization
+    
+    if not auth_value.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
     
-    token = authorization.replace("Bearer ", "")
+    token = auth_value.replace("Bearer ", "")
     payload = verify_auth_token(token)
     
     return {
@@ -301,7 +307,7 @@ def authorize_live_playback(
         secret=settings.playback_token_secret,
     )
 
-    playback_url = f"{settings.ome_playback_base_url}/app/{stream_name}/playlist.m3u8?token={token}"
+    playback_url = f"{settings.ome_playback_base_url}/tavuno/{stream_name}/llhls.m3u8?token={token}"
 
     return {
         "session_id": session_id,
