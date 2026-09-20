@@ -45,6 +45,7 @@ class PlayerRecoveryExecutionPortAdapterTest {
         incrementChannelErrorCount = { _: Long -> Result.Success(Unit) },
         logRepositoryFailure = { _: String, _: Result<Unit> -> },
         fallbackToPreviousChannel = { _: String -> false },
-        hasLastChannel = { false }
+        hasLastChannel = { false },
+        onPlaybackEnded = { }
     )
 }

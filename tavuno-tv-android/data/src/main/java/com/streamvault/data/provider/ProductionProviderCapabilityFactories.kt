@@ -172,10 +172,11 @@ class JellyfinCapabilityFactory @Inject constructor(
 }
 
 @Singleton
-class TavunoCapabilityFactory @Inject constructor() : ProviderCapabilityFactory {
+class TavunoCapabilityFactory @Inject constructor(
+    private val tavunoPlaybackResolver: com.streamvault.data.remote.tavuno.TavunoPlaybackResolver
+) : ProviderCapabilityFactory {
     override val providerType = ProviderType.TAVUNO
     override fun create(snapshot: ProviderSnapshot): ProviderCapabilitySet {
-        // Stub implementation for M9 - full Tavuno provider behavior arrives in M10
         return FixedProviderCapabilitySet(
             snapshot = snapshot,
             authentication = CapabilityResolution.Unsupported("Tavuno authentication not yet implemented"),
@@ -183,7 +184,7 @@ class TavunoCapabilityFactory @Inject constructor() : ProviderCapabilityFactory 
             vodCatalog = CapabilityResolution.Unsupported("Tavuno VOD catalog not yet implemented"),
             seriesCatalog = CapabilityResolution.Unsupported("Tavuno series catalog not yet implemented"),
             guide = CapabilityResolution.Unsupported("Tavuno guide not yet implemented"),
-            playback = CapabilityResolution.Unsupported("Tavuno playback not yet implemented"),
+            playback = available(tavunoPlaybackResolver),
             catchUp = CapabilityResolution.Unsupported("Tavuno catch-up not yet implemented")
         )
     }

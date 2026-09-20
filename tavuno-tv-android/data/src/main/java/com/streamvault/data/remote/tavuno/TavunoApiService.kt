@@ -59,6 +59,32 @@ interface TavunoApiService {
     @GET("v1/sports")
     suspend fun getSports(): Response<List<CategoryDto>>
 
+    // Sports endpoints (M11)
+    @GET("v1/sports/competitions")
+    suspend fun getCompetitions(@Query("sport") sport: String?): Response<List<CompetitionDto>>
+
+    @GET("v1/sports/competitions/{id}")
+    suspend fun getCompetition(@Path("id") competitionId: Int): Response<CompetitionDto>
+
+    @GET("v1/sports/competitions/{id}/matches")
+    suspend fun getCompetitionMatches(
+        @Path("id") competitionId: Int,
+        @Query("status") status: String?,
+        @Query("limit") limit: Int
+    ): Response<List<MatchDto>>
+
+    @GET("v1/sports/matches")
+    suspend fun getMatches(
+        @Query("status") status: String?,
+        @Query("limit") limit: Int
+    ): Response<List<MatchDto>>
+
+    @GET("v1/sports/matches/{id}")
+    suspend fun getMatch(@Path("id") matchId: Int): Response<MatchDto>
+
+    @GET("v1/sports/matches/{id}/details")
+    suspend fun getMatchDetails(@Path("id") matchId: Int): Response<MatchDetailsDto>
+
     // Content detail endpoints (M12)
     @GET("v1/channels/{id}/details")
     suspend fun getChannelDetails(@Path("id") channelId: Int): Response<ChannelDetailsDto>
@@ -72,7 +98,23 @@ interface TavunoApiService {
     // Playback authorization endpoints (M12.5)
     @POST("v1/playback/live/{channel_id}")
     suspend fun authorizeLivePlayback(
-        @Path("channel_id") channelId: Int,
-        @Body request: PlaybackRequest
+        @Path("channel_id") channelId: Int
     ): Response<PlaybackResponse>
+
+    @POST("v1/playback/heartbeat")
+    suspend fun heartbeatPlayback(
+        @Body request: SessionRequest
+    ): Response<SessionResponse>
+
+    @POST("v1/playback/stop")
+    suspend fun stopPlayback(
+        @Body request: SessionRequest
+    ): Response<SessionResponse>
+
+    // EPG endpoints (M13)
+    @GET("v1/epg")
+    suspend fun getEpg(@Query("channel_id") channelId: Int?): Response<List<EpgProgramDto>>
+
+    @GET("v1/epg/channel/{channel_id}/now-next")
+    suspend fun getEpgNowNext(@Path("channel_id") channelId: Int): Response<EpgNowNextDto>
 }

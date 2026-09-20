@@ -45,7 +45,8 @@ data class ResolvedPlayback(
     val allowInvalidSsl: Boolean = false,
     val proxyHost: String = "",
     val proxyPort: Int? = null,
-    val observations: List<PlaybackObservation> = emptyList()
+    val observations: List<PlaybackObservation> = emptyList(),
+    val tavunoSessionId: Int? = null  // Optional Tavuno playback session ID
 )
 
 /** State learned while resolving, returned as data so the resolver itself remains side-effect free. */

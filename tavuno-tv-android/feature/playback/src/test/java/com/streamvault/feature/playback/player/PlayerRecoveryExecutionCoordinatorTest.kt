@@ -113,6 +113,8 @@ class PlayerRecoveryExecutionCoordinatorTest {
 
         override fun fallbackToPreviousChannel(reason: String): Boolean = false
 
+        override fun onPlaybackEnded() = Unit
+
         override fun hasLastChannel(): Boolean = false
     }
 

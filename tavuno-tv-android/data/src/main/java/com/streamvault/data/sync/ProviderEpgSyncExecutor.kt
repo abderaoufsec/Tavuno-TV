@@ -457,6 +457,39 @@ internal class ProviderEpgSyncExecutor(
         onProgress: ((String) -> Unit)?
     ): ProviderGuideSyncResult = syncProviderEpg(provider, metadata, now, force, onProgress) { false }
 
+    suspend fun syncTavunoProviderEpg(
+        provider: Provider,
+        metadata: SyncMetadata,
+        now: Long,
+        force: Boolean,
+        onProgress: ((String) -> Unit)?
+    ): ProviderGuideSyncResult = syncProviderEpg(provider, metadata, now, force, onProgress) { warnings ->
+        var retryable = false
+        if (shouldUseProviderGuide(provider.guideSourcePolicy) &&
+            (force || ContentCachePolicy.shouldRefresh(metadata.lastEpgSuccess, ContentCachePolicy.EPG_TTL_MILLIS, now))
+        ) {
+            try {
+                progress(provider.id, onProgress, "Downloading Tavuno EPG...")
+                // Tavuno EPG URL is not used; the API endpoint is called internally
+                xtreamSupport.retryTransient {
+                    requireResult(epgRepository.refreshEpg(provider.id, ""), "Failed to refresh Tavuno EPG")
+                }
+                val epgCount = programDao.countByProvider(provider.id)
+                syncMetadataRepository.updateMetadata(
+                    metadata.copy(lastEpgSync = now, lastEpgSuccess = now, epgCount = epgCount)
+                )
+                if (epgCount == 0) warnings += "Tavuno EPG imported zero programs; live guide may be empty."
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Tavuno EPG sync failed (non-fatal): ${sanitizeThrowableMessage(e)}")
+                retryable = isRetryableEpgException(e)
+                warnings += "Tavuno EPG sync failed."
+            }
+        }
+        retryable
+    }
+
     suspend fun syncXtreamEpgOnly(provider: Provider, onProgress: ((String) -> Unit)?) =
         syncXmlTvEpgOnly(
             provider = provider,

@@ -29,6 +29,8 @@ internal interface CatalogSyncPlanDelegate {
     suspend fun syncJellyfinMovies(request: SectionProviderSyncRequest): SyncOutcome
     suspend fun syncJellyfinSeries(request: SectionProviderSyncRequest): SyncOutcome
     suspend fun syncJellyfinGuide(request: ProviderGuideSyncRequest): ProviderGuideSyncResult
+
+    suspend fun syncTavunoGuide(request: ProviderGuideSyncRequest): ProviderGuideSyncResult
 }
 
 /** Operations supplied by the data layer to the provider-neutral plan objects. */
@@ -62,6 +64,10 @@ internal data class JellyfinCatalogSyncOperations(
     val full: suspend (FullProviderSyncRequest) -> SyncOutcome,
     val movies: suspend (SectionProviderSyncRequest) -> SyncOutcome,
     val series: suspend (SectionProviderSyncRequest) -> SyncOutcome,
+    val guide: suspend (ProviderGuideSyncRequest) -> ProviderGuideSyncResult
+)
+
+internal data class TavunoCatalogSyncOperations(
     val guide: suspend (ProviderGuideSyncRequest) -> ProviderGuideSyncResult
 )
 
@@ -188,18 +194,55 @@ internal class JellyfinCatalogSyncPlan(
         CapabilityResolution.Available(operations.guide(request))
 }
 
+internal class TavunoCatalogSyncPlan(
+    private val operations: TavunoCatalogSyncOperations
+) : CatalogSyncPlan {
+    override val providerType: ProviderType = ProviderType.TAVUNO
+
+    override suspend fun syncFull(request: FullProviderSyncRequest): SyncOutcome =
+        SyncOutcome()
+
+    override suspend fun syncSection(
+        request: SectionProviderSyncRequest
+    ): CapabilityResolution<SyncOutcome> {
+        return when (request.section) {
+            SyncRepairSection.EPG -> {
+                operations.guide(
+                    ProviderGuideSyncRequest(
+                        snapshot = request.snapshot,
+                        now = System.currentTimeMillis(),
+                        force = false,
+                        onProgress = request.onProgress
+                    )
+                )
+                CapabilityResolution.Available(SyncOutcome())
+            }
+            else -> CapabilityResolution.Unsupported(
+                "Section retry is unavailable for Tavuno providers"
+            )
+        }
+    }
+
+    override suspend fun syncGuide(
+        request: ProviderGuideSyncRequest
+    ): CapabilityResolution<ProviderGuideSyncResult> =
+        CapabilityResolution.Available(operations.guide(request))
+}
+
 internal object CatalogSyncPlanFactory {
     fun create(
         xtream: XtreamCatalogSyncOperations,
         m3u: M3uCatalogSyncOperations,
         stalker: StalkerCatalogSyncOperations,
-        jellyfin: JellyfinCatalogSyncOperations
+        jellyfin: JellyfinCatalogSyncOperations,
+        tavuno: TavunoCatalogSyncOperations
     ): CatalogSyncPlanRegistry = CatalogSyncPlanRegistry(
         listOf(
             XtreamCatalogSyncPlan(xtream),
             M3uCatalogSyncPlan(m3u),
             StalkerCatalogSyncPlan(stalker),
-            JellyfinCatalogSyncPlan(jellyfin)
+            JellyfinCatalogSyncPlan(jellyfin),
+            TavunoCatalogSyncPlan(tavuno)
         )
     )
 }
@@ -237,6 +280,9 @@ internal class CatalogSyncPlanAssembler(
                 movies = delegate::syncJellyfinMovies,
                 series = delegate::syncJellyfinSeries,
                 guide = delegate::syncJellyfinGuide
+            ),
+            tavuno = TavunoCatalogSyncOperations(
+                guide = delegate::syncTavunoGuide
             )
         )
     }

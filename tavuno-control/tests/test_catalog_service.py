@@ -5,7 +5,7 @@ from unittest.mock import Mock, MagicMock, patch
 from contextlib import contextmanager
 
 from app.catalog.service import CatalogService
-from app.catalog.models import Channel, Category, Movie, Series
+from app.catalog.models import Channel, Category, Movie, Series, Competition, Team, Match, MatchDetails
 
 
 @pytest.fixture
@@ -654,3 +654,441 @@ class TestGetHome:
         assert len(home_data["featured_channels"]) == 1
         assert isinstance(home_data["categories"][0], Category)
         assert isinstance(home_data["featured_channels"][0], Channel)
+
+
+# M11 Sports Tests
+
+class TestCompetitionMapping:
+    """Test competition row to model mapping (M11)."""
+
+    def test_map_competition_basic(self, catalog_service):
+        """Test mapping a basic competition row."""
+        row = {
+            "id": 1,
+            "name": "Premier League",
+            "slug": "premier-league",
+            "sport": "football",
+            "category": 5,
+            "external_id": "prem_123",
+            "is_active": True,
+        }
+        competition = catalog_service._map_competition(row)
+
+        assert isinstance(competition, Competition)
+        assert competition.id == 1
+        assert competition.name == "Premier League"
+        assert competition.slug == "premier-league"
+        assert competition.sport == "football"
+        assert competition.category_id == 5
+        assert competition.external_id == "prem_123"
+        assert competition.is_active is True
+
+    def test_map_competition_nullable_fields(self, catalog_service):
+        """Test mapping competition with nullable fields."""
+        row = {
+            "id": 2,
+            "name": "Custom League",
+            "slug": "custom-league",
+            "sport": "basketball",
+            "category": None,
+            "external_id": None,
+            "is_active": True,
+        }
+        competition = catalog_service._map_competition(row)
+
+        assert competition.category_id is None
+        assert competition.external_id is None
+
+
+class TestTeamMapping:
+    """Test team row to model mapping (M11)."""
+
+    def test_map_team_basic(self, catalog_service):
+        """Test mapping a basic team row."""
+        row = {
+            "id": 1,
+            "name": "Manchester United",
+            "slug": "manchester-united",
+            "competition": 5,
+            "logo": "uuid-123",
+            "external_id": "team_456",
+            "is_active": True,
+        }
+        team = catalog_service._map_team(row)
+
+        assert isinstance(team, Team)
+        assert team.id == 1
+        assert team.name == "Manchester United"
+        assert team.slug == "manchester-united"
+        assert team.competition_id == 5
+        assert team.logo == "uuid-123"
+        assert team.external_id == "team_456"
+        assert team.is_active is True
+
+    def test_map_team_nullable_fields(self, catalog_service):
+        """Test mapping team with nullable fields."""
+        row = {
+            "id": 2,
+            "name": "Independent Team",
+            "slug": "independent-team",
+            "competition": None,
+            "logo": None,
+            "external_id": None,
+            "is_active": True,
+        }
+        team = catalog_service._map_team(row)
+
+        assert team.competition_id is None
+        assert team.logo is None
+        assert team.external_id is None
+
+
+class TestMatchMapping:
+    """Test match row to model mapping (M11)."""
+
+    def test_map_match_basic(self, catalog_service):
+        """Test mapping a basic match row."""
+        from datetime import datetime, timezone
+
+        kickoff = datetime(2024, 6, 15, 15, 0, 0, tzinfo=timezone.utc)
+        row = {
+            "id": 1,
+            "competition": 5,
+            "home_team": 10,
+            "away_team": 11,
+            "channel": 20,
+            "kickoff": kickoff,
+            "status": "upcoming",
+            "home_score": None,
+            "away_score": None,
+            "external_id": "match_789",
+            "is_active": True,
+        }
+        match = catalog_service._map_match(row)
+
+        assert isinstance(match, Match)
+        assert match.id == 1
+        assert match.competition_id == 5
+        assert match.home_team_id == 10
+        assert match.away_team_id == 11
+        assert match.channel_id == 20
+        assert match.status == "upcoming"
+        assert match.home_score is None
+        assert match.away_score is None
+        assert match.external_id == "match_789"
+        assert match.is_active is True
+
+    def test_map_match_with_scores(self, catalog_service):
+        """Test mapping match with scores."""
+        from datetime import datetime, timezone
+
+        kickoff = datetime(2024, 6, 15, 15, 0, 0, tzinfo=timezone.utc)
+        row = {
+            "id": 2,
+            "competition": 5,
+            "home_team": 10,
+            "away_team": 11,
+            "channel": 20,
+            "kickoff": kickoff,
+            "status": "live",
+            "home_score": 2,
+            "away_score": 1,
+            "external_id": None,
+            "is_active": True,
+        }
+        match = catalog_service._map_match(row)
+
+        assert match.status == "live"
+        assert match.home_score == 2
+        assert match.away_score == 1
+
+
+class TestMatchDetailsMapping:
+    """Test match details row to model mapping (M11)."""
+
+    def test_map_match_details_basic(self, catalog_service):
+        """Test mapping a basic match details row."""
+        from datetime import datetime, timezone
+
+        kickoff = datetime(2024, 6, 15, 15, 0, 0, tzinfo=timezone.utc)
+        row = {
+            "id": 1,
+            "competition": 5,
+            "competition_name": "Premier League",
+            "home_team": 10,
+            "home_team_name": "Manchester United",
+            "home_team_logo": "uuid-123",
+            "away_team": 11,
+            "away_team_name": "Chelsea",
+            "away_team_logo": "uuid-456",
+            "channel": 20,
+            "channel_name": "Sports 1",
+            "kickoff": kickoff,
+            "status": "upcoming",
+            "home_score": None,
+            "away_score": None,
+            "is_active": True,
+        }
+        match_details = catalog_service._map_match_details(row)
+
+        assert isinstance(match_details, MatchDetails)
+        assert match_details.id == 1
+        assert match_details.competition_name == "Premier League"
+        assert match_details.home_team_name == "Manchester United"
+        assert match_details.away_team_name == "Chelsea"
+        assert match_details.channel_name == "Sports 1"
+        assert match_details.status == "upcoming"
+
+
+class TestGetCompetitions:
+    """Test get_competitions method (M11)."""
+
+    def test_get_competitions_all(self, catalog_service, mock_connection):
+        """Test getting all competitions."""
+        mock_rows = [
+            {
+                "id": 1,
+                "name": "Premier League",
+                "slug": "premier-league",
+                "sport": "football",
+                "category": 5,
+                "external_id": None,
+                "is_active": True,
+            },
+            {
+                "id": 2,
+                "name": "La Liga",
+                "slug": "la-liga",
+                "sport": "football",
+                "category": 5,
+                "external_id": None,
+                "is_active": True,
+            },
+        ]
+
+        mock_connection.execute.return_value.fetchall.return_value = mock_rows
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            competitions = catalog_service.get_competitions()
+
+        assert len(competitions) == 2
+        assert all(isinstance(c, Competition) for c in competitions)
+        assert competitions[0].name == "Premier League"
+        assert competitions[1].name == "La Liga"
+
+    def test_get_competitions_filtered_by_sport(self, catalog_service, mock_connection):
+        """Test getting competitions filtered by sport."""
+        mock_rows = [
+            {
+                "id": 1,
+                "name": "Premier League",
+                "slug": "premier-league",
+                "sport": "football",
+                "category": 5,
+                "external_id": None,
+                "is_active": True,
+            },
+        ]
+
+        mock_connection.execute.return_value.fetchall.return_value = mock_rows
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            competitions = catalog_service.get_competitions(sport="football")
+
+        assert len(competitions) == 1
+        assert competitions[0].sport == "football"
+
+
+class TestGetCompetition:
+    """Test get_competition method (M11)."""
+
+    def test_get_competition_found(self, catalog_service, mock_connection):
+        """Test getting a competition that exists."""
+        mock_row = {
+            "id": 1,
+            "name": "Premier League",
+            "slug": "premier-league",
+            "sport": "football",
+            "category": 5,
+            "external_id": None,
+            "is_active": True,
+        }
+
+        mock_connection.execute.return_value.fetchone.return_value = mock_row
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            competition = catalog_service.get_competition(1)
+
+        assert competition is not None
+        assert isinstance(competition, Competition)
+        assert competition.id == 1
+        assert competition.name == "Premier League"
+
+    def test_get_competition_not_found(self, catalog_service, mock_connection):
+        """Test getting a competition that doesn't exist."""
+        mock_connection.execute.return_value.fetchone.return_value = None
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            competition = catalog_service.get_competition(999)
+
+        assert competition is None
+
+
+class TestGetMatches:
+    """Test get_matches method (M11)."""
+
+    def test_get_matches_all(self, catalog_service, mock_connection):
+        """Test getting all matches."""
+        from datetime import datetime, timezone
+
+        kickoff = datetime(2024, 6, 15, 15, 0, 0, tzinfo=timezone.utc)
+        mock_rows = [
+            {
+                "id": 1,
+                "competition": 5,
+                "home_team": 10,
+                "away_team": 11,
+                "channel": 20,
+                "kickoff": kickoff,
+                "status": "upcoming",
+                "home_score": None,
+                "away_score": None,
+                "external_id": None,
+                "is_active": True,
+            },
+        ]
+
+        mock_connection.execute.return_value.fetchall.return_value = mock_rows
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            matches = catalog_service.get_matches()
+
+        assert len(matches) == 1
+        assert all(isinstance(m, Match) for m in matches)
+
+    def test_get_matches_filtered_by_status(self, catalog_service, mock_connection):
+        """Test getting matches filtered by status."""
+        from datetime import datetime, timezone
+
+        kickoff = datetime(2024, 6, 15, 15, 0, 0, tzinfo=timezone.utc)
+        mock_rows = [
+            {
+                "id": 1,
+                "competition": 5,
+                "home_team": 10,
+                "away_team": 11,
+                "channel": 20,
+                "kickoff": kickoff,
+                "status": "live",
+                "home_score": 2,
+                "away_score": 1,
+                "external_id": None,
+                "is_active": True,
+            },
+        ]
+
+        mock_connection.execute.return_value.fetchall.return_value = mock_rows
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            matches = catalog_service.get_matches(status="live")
+
+        assert len(matches) == 1
+        assert matches[0].status == "live"
+
+
+class TestGetMatch:
+    """Test get_match method (M11)."""
+
+    def test_get_match_found(self, catalog_service, mock_connection):
+        """Test getting a match that exists."""
+        from datetime import datetime, timezone
+
+        kickoff = datetime(2024, 6, 15, 15, 0, 0, tzinfo=timezone.utc)
+        mock_row = {
+            "id": 1,
+            "competition": 5,
+            "home_team": 10,
+            "away_team": 11,
+            "channel": 20,
+            "kickoff": kickoff,
+            "status": "upcoming",
+            "home_score": None,
+            "away_score": None,
+            "external_id": None,
+            "is_active": True,
+        }
+
+        mock_connection.execute.return_value.fetchone.return_value = mock_row
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            match = catalog_service.get_match(1)
+
+        assert match is not None
+        assert isinstance(match, Match)
+        assert match.id == 1
+
+    def test_get_match_not_found(self, catalog_service, mock_connection):
+        """Test getting a match that doesn't exist."""
+        mock_connection.execute.return_value.fetchone.return_value = None
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            match = catalog_service.get_match(999)
+
+        assert match is None
+
+
+class TestGetMatchDetails:
+    """Test get_match_details method (M11)."""
+
+    def test_get_match_details_found(self, catalog_service, mock_connection):
+        """Test getting match details that exist."""
+        from datetime import datetime, timezone
+
+        kickoff = datetime(2024, 6, 15, 15, 0, 0, tzinfo=timezone.utc)
+        mock_row = {
+            "id": 1,
+            "competition": 5,
+            "competition_name": "Premier League",
+            "home_team": 10,
+            "home_team_name": "Manchester United",
+            "home_team_logo": "uuid-123",
+            "away_team": 11,
+            "away_team_name": "Chelsea",
+            "away_team_logo": "uuid-456",
+            "channel": 20,
+            "channel_name": "Sports 1",
+            "kickoff": kickoff,
+            "status": "upcoming",
+            "home_score": None,
+            "away_score": None,
+            "is_active": True,
+        }
+
+        mock_connection.execute.return_value.fetchone.return_value = mock_row
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            match_details = catalog_service.get_match_details(1)
+
+        assert match_details is not None
+        assert isinstance(match_details, MatchDetails)
+        assert match_details.id == 1
+        assert match_details.competition_name == "Premier League"
+
+    def test_get_match_details_not_found(self, catalog_service, mock_connection):
+        """Test getting match details that don't exist."""
+        mock_connection.execute.return_value.fetchone.return_value = None
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            match_details = catalog_service.get_match_details(999)
+
+        assert match_details is None

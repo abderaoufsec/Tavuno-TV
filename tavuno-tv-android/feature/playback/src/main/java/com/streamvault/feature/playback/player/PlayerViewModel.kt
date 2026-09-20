@@ -76,6 +76,7 @@ class PlayerViewModel @Inject constructor(
     internal val playerPlaybackContextCoordinator: PlayerPlaybackContextCoordinator,
     internal val playerRecoveryCoordinator: PlayerRecoveryCoordinator,
     internal val playerRecoveryExecutionCoordinator: PlayerRecoveryExecutionCoordinator,
+    private val tavunoPlaybackSessionRepository: com.streamvault.domain.repository.TavunoPlaybackSessionRepository,
 ) : ViewModel() {
     companion object {
         private const val MIN_WATCHED_FOR_AUTO_PLAY_MS = 5_000L
@@ -223,6 +224,7 @@ class PlayerViewModel @Inject constructor(
     internal var lastRecordedVariantObservationSignature: String? = null
     internal var lastRecordedVodVariantObservationSignature: String? = null
     internal val playbackSessionCoordinator = PlaybackSessionCoordinator(viewModelScope)
+    private var tavunoSessionId: Int? = null
     private val playerRecoveryExecutionPort = PlayerRecoveryExecutionPortAdapter(
         appPackageName = appContext.packageName,
         engineCoordinator = playerEngineCoordinator,
@@ -265,7 +267,8 @@ class PlayerViewModel @Inject constructor(
         },
         logRepositoryFailure = { operation, result -> logRepositoryFailure(operation, result) },
         fallbackToPreviousChannel = { reason -> fallbackToPreviousChannel(reason) },
-        hasLastChannel = { hasLastChannel() }
+        hasLastChannel = { hasLastChannel() },
+        onPlaybackEnded = { stopTavunoSession() }
     )
     internal val prepareRequestVersion: Long
         get() = playbackSessionCoordinator.currentId
@@ -966,6 +969,7 @@ class PlayerViewModel @Inject constructor(
         stopLiveTranslationSession()
         lastRecordedVariantObservationSignature = null
         lastRecordedVodVariantObservationSignature = null
+        stopTavunoSession()  // Stop existing Tavuno session on channel switch
         livePlaybackReadyForCurrentSession = false
         readySideEffectsRequestVersion = null
         playerEngine.setScrubbingMode(false)
@@ -1268,6 +1272,7 @@ class PlayerViewModel @Inject constructor(
         if (preparationResult is PlayerPreparationCoordinator.Result.Failure) {
             if (!isActivePlaybackSession(requestVersion)) return false
             setLastFailureReason(preparationResult.message)
+            stopTavunoSession()  // Cleanup Tavuno session on player preparation failure
             if (showFailureNotice) {
                 showPlayerNotice(
                     message = preparationResult.message,
@@ -1287,6 +1292,13 @@ class PlayerViewModel @Inject constructor(
         refreshLiveTranslationAvailability()
         startTokenRenewalMonitoring(success.streamInfo.expirationTime)
         maybeStartLiveTimeshift(success.streamInfo)
+        
+        // Start Tavuno session if this is a Tavuno playback
+        val tavunoSessionId = success.streamInfo.tavunoSessionId
+        if (tavunoSessionId != null && isActivePlaybackSession(requestVersion)) {
+            startTavunoSession(tavunoSessionId)
+        }
+        
         return true
     }
 
@@ -1688,7 +1700,37 @@ class PlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         playbackSessionCoordinator.invalidate()
+        stopTavunoSession()
         super.onCleared()
         cleanupAfterCleared(playerEngineCoordinator.mainEngine)
+    }
+
+    /**
+     * Start a Tavuno playback session with the given session ID.
+     * Called after successful player preparation.
+     */
+    private fun startTavunoSession(sessionId: Int) {
+        tavunoSessionId = sessionId
+        tavunoPlaybackSessionRepository.startSession(sessionId, viewModelScope)
+    }
+
+    /**
+     * Stop the current Tavuno playback session.
+     * Called on playback end, channel change, or ViewModel cleanup.
+     */
+    private fun stopTavunoSession() {
+        val sessionId = tavunoSessionId
+        tavunoSessionId = null
+        if (sessionId != null) {
+            tavunoPlaybackSessionRepository.stopSession()
+        }
+    }
+
+    /**
+     * Check if a session ID matches the current Tavuno session.
+     * Used to guard against stale callbacks.
+     */
+    private fun isCurrentTavunoSession(sessionId: Int): Boolean {
+        return tavunoSessionId == sessionId
     }
 }

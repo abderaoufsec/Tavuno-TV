@@ -105,7 +105,7 @@ dependencies {
     // kxml2: JVM XmlPullParser implementation needed for XmltvParser unit tests
     // (Android platform provides its own impl; the JVM test runner needs an explicit one)
     testImplementation(libs.kxml2)
-    // Mocking for SyncManagerTest
+    // Mocking for SyncManagerTest and TavunoPlaybackSessionManagerTest
     testImplementation(libs.mockito.kotlin)
 
     // Android instrumentation tests

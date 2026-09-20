@@ -30,6 +30,7 @@ internal class PlayerRecoveryExecutionPortAdapter(
     private val logRepositoryFailure: (String, Result<Unit>) -> Unit,
     private val fallbackToPreviousChannel: (String) -> Boolean,
     private val hasLastChannel: () -> Boolean,
+    private val onPlaybackEnded: () -> Unit,
 ) : PlayerRecoveryExecutionPort {
     override val playerEngine: PlayerEngine
         get() = engineCoordinator.currentEngine
@@ -96,4 +97,8 @@ internal class PlayerRecoveryExecutionPortAdapter(
     override fun fallbackToPreviousChannel(reason: String): Boolean = fallbackToPreviousChannel.invoke(reason)
 
     override fun hasLastChannel(): Boolean = hasLastChannel.invoke()
+
+    override fun onPlaybackEnded() {
+        onPlaybackEnded.invoke()
+    }
 }

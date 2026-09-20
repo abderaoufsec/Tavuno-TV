@@ -57,5 +57,6 @@ private fun ResolvedStreamUrl.toDomain(): ResolvedPlayback = ResolvedPlayback(
     allowInvalidSsl = allowInvalidSsl,
     proxyHost = proxyHost,
     proxyPort = proxyPort,
-    observations = observations
+    observations = observations,
+    tavunoSessionId = null  // Data layer resolvers should set this for Tavuno
 )

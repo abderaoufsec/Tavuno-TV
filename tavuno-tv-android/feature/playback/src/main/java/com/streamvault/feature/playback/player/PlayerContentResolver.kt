@@ -181,7 +181,8 @@ internal suspend fun resolvePlayerPlaybackStreamInfo(
                     proxyPort = resolved.proxyPort,
                     streamType = StreamType.fromContainerExtension(ext),
                     containerExtension = ext,
-                    expirationTime = resolved.expirationTime
+                    expirationTime = resolved.expirationTime,
+                    tavunoSessionId = resolved.tavunoSessionId
                 )
             )
         }

@@ -15,7 +15,11 @@ The service:
 from typing import Optional, List
 from contextlib import contextmanager
 
-from .models import Channel, Category, Movie, Series, ChannelDetails, MovieDetails, SeriesDetails
+from .models import (
+    Channel, Category, Movie, Series,
+    ChannelDetails, MovieDetails, SeriesDetails,
+    Competition, Team, Match, MatchDetails
+)
 
 
 class CatalogService:
@@ -83,7 +87,7 @@ class CatalogService:
 
     def _map_series(self, row: dict) -> Series:
         """Map database row to Series model.
-        
+
         Database columns: id, title, slug, category, synopsis, is_active
         Model fields: id, title, slug, category_id, synopsis, is_active
         """
@@ -93,6 +97,84 @@ class CatalogService:
             slug=row["slug"],
             category_id=row.get("category"),  # Map 'category' to 'category_id'
             synopsis=row.get("synopsis"),
+            is_active=row["is_active"],
+        )
+
+    # M11 Sports mappers
+
+    def _map_competition(self, row: dict) -> Competition:
+        """Map database row to Competition model (M11).
+
+        Database columns: id, name, slug, sport, category, external_id, is_active
+        Model fields: id, name, slug, sport, category_id, external_id, is_active
+        """
+        return Competition(
+            id=row["id"],
+            name=row["name"],
+            slug=row["slug"],
+            sport=row["sport"],
+            category_id=row.get("category"),
+            external_id=row.get("external_id"),
+            is_active=row["is_active"],
+        )
+
+    def _map_team(self, row: dict) -> Team:
+        """Map database row to Team model (M11).
+
+        Database columns: id, name, slug, competition, logo, external_id, is_active
+        Model fields: id, name, slug, competition_id, logo, external_id, is_active
+        """
+        return Team(
+            id=row["id"],
+            name=row["name"],
+            slug=row["slug"],
+            competition_id=row.get("competition"),
+            logo=str(row["logo"]) if row.get("logo") else None,
+            external_id=row.get("external_id"),
+            is_active=row["is_active"],
+        )
+
+    def _map_match(self, row: dict) -> Match:
+        """Map database row to Match model (M11).
+
+        Database columns: id, competition, home_team, away_team, channel, kickoff, status, home_score, away_score, external_id, is_active
+        Model fields: id, competition_id, home_team_id, away_team_id, channel_id, kickoff, status, home_score, away_score, external_id, is_active
+        """
+        return Match(
+            id=row["id"],
+            competition_id=row["competition"],
+            home_team_id=row["home_team"],
+            away_team_id=row["away_team"],
+            channel_id=row.get("channel"),
+            kickoff=row["kickoff"].isoformat() if row.get("kickoff") else None,
+            status=row["status"],
+            home_score=row.get("home_score"),
+            away_score=row.get("away_score"),
+            external_id=row.get("external_id"),
+            is_active=row["is_active"],
+        )
+
+    def _map_match_details(self, row: dict) -> MatchDetails:
+        """Map database row to MatchDetails model (M11).
+
+        Includes joined data from competitions, teams, and channels.
+        """
+        return MatchDetails(
+            id=row["id"],
+            competition_id=row["competition"],
+            competition_name=row.get("competition_name"),
+            home_team_id=row["home_team"],
+            home_team_name=row["home_team_name"],
+            home_team_logo=str(row["home_team_logo"]) if row.get("home_team_logo") else None,
+            away_team_id=row["away_team"],
+            away_team_name=row["away_team_name"],
+            away_team_logo=str(row["away_team_logo"]) if row.get("away_team_logo") else None,
+            channel_id=row.get("channel"),
+            channel_name=row.get("channel_name"),
+            kickoff=row["kickoff"].isoformat() if row.get("kickoff") else None,
+            status=row["status"],
+            home_score=row.get("home_score"),
+            away_score=row.get("away_score"),
             is_active=row["is_active"],
         )
 
@@ -399,3 +481,190 @@ class CatalogService:
             episode_count=None,  # No episode data in current schema
             playback_available=True,  # Assume available if active
         )
+
+    # M11 Sports service methods
+
+    def get_competitions(self, sport: Optional[str] = None) -> List[Competition]:
+        """Get all active competitions, optionally filtered by sport (M11).
+
+        Args:
+            sport: Optional sport filter (e.g., "football", "basketball")
+
+        Returns:
+            List of Competition models
+        """
+        with self._db() as conn:
+            if sport:
+                rows = conn.execute(
+                    """
+                    SELECT id, name, slug, sport, category, external_id, is_active
+                    FROM tavuno_competitions
+                    WHERE sport = %s AND is_active = TRUE
+                    ORDER BY name
+                    """,
+                    (sport,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id, name, slug, sport, category, external_id, is_active
+                    FROM tavuno_competitions
+                    WHERE is_active = TRUE
+                    ORDER BY sport, name
+                    """,
+                ).fetchall()
+
+        return [self._map_competition(row) for row in rows]
+
+    def get_competition(self, competition_id: int) -> Optional[Competition]:
+        """Get a specific competition by ID (M11).
+
+        Args:
+            competition_id: Competition ID
+
+        Returns:
+            Competition model or None if not found
+        """
+        with self._db() as conn:
+            row = conn.execute(
+                """
+                SELECT id, name, slug, sport, category, external_id, is_active
+                FROM tavuno_competitions
+                WHERE id = %s AND is_active = TRUE
+                """,
+                (competition_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._map_competition(row)
+
+    def get_teams(self, competition_id: Optional[int] = None) -> List[Team]:
+        """Get all active teams, optionally filtered by competition (M11).
+
+        Args:
+            competition_id: Optional competition filter
+
+        Returns:
+            List of Team models
+        """
+        with self._db() as conn:
+            if competition_id:
+                rows = conn.execute(
+                    """
+                    SELECT id, name, slug, competition, logo, external_id, is_active
+                    FROM tavuno_teams
+                    WHERE competition = %s AND is_active = TRUE
+                    ORDER BY name
+                    """,
+                    (competition_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id, name, slug, competition, logo, external_id, is_active
+                    FROM tavuno_teams
+                    WHERE is_active = TRUE
+                    ORDER BY name
+                    """,
+                ).fetchall()
+
+        return [self._map_team(row) for row in rows]
+
+    def get_matches(
+        self,
+        competition_id: Optional[int] = None,
+        status: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Match]:
+        """Get matches, optionally filtered by competition and status (M11).
+
+        Args:
+            competition_id: Optional competition filter
+            status: Optional status filter ("upcoming", "live", "finished", "postponed")
+            limit: Maximum number of matches to return
+
+        Returns:
+            List of Match models
+        """
+        with self._db() as conn:
+            query = """
+                SELECT id, competition, home_team, away_team, channel, kickoff, status, home_score, away_score, external_id, is_active
+                FROM tavuno_matches
+                WHERE is_active = TRUE
+            """
+            params = []
+
+            if competition_id:
+                query += " AND competition = %s"
+                params.append(competition_id)
+
+            if status:
+                query += " AND status = %s"
+                params.append(status)
+
+            query += " ORDER BY kickoff DESC LIMIT %s"
+            params.append(limit)
+
+            rows = conn.execute(query, tuple(params)).fetchall()
+
+        return [self._map_match(row) for row in rows]
+
+    def get_match(self, match_id: int) -> Optional[Match]:
+        """Get a specific match by ID (M11).
+
+        Args:
+            match_id: Match ID
+
+        Returns:
+            Match model or None if not found
+        """
+        with self._db() as conn:
+            row = conn.execute(
+                """
+                SELECT id, competition, home_team, away_team, channel, kickoff, status, home_score, away_score, external_id, is_active
+                FROM tavuno_matches
+                WHERE id = %s AND is_active = TRUE
+                """,
+                (match_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._map_match(row)
+
+    def get_match_details(self, match_id: int) -> Optional[MatchDetails]:
+        """Get detailed match information with team names and channel (M11).
+
+        Args:
+            match_id: Match ID
+
+        Returns:
+            MatchDetails model or None if not found
+        """
+        with self._db() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    m.id, m.competition, m.home_team, m.away_team, m.channel,
+                    m.kickoff, m.status, m.home_score, m.away_score, m.is_active,
+                    comp.name as competition_name,
+                    ht.name as home_team_name, ht.logo as home_team_logo,
+                    at.name as away_team_name, at.logo as away_team_logo,
+                    ch.name as channel_name
+                FROM tavuno_matches m
+                LEFT JOIN tavuno_competitions comp ON m.competition = comp.id
+                LEFT JOIN tavuno_teams ht ON m.home_team = ht.id
+                LEFT JOIN tavuno_teams at ON m.away_team = at.id
+                LEFT JOIN tavuno_channels ch ON m.channel = ch.id
+                WHERE m.id = %s AND m.is_active = TRUE
+                """,
+                (match_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._map_match_details(row)

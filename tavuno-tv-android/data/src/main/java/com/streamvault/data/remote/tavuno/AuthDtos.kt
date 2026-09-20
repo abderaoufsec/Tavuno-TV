@@ -196,6 +196,17 @@ data class PlaybackRequest(
     val deviceKey: String? = null
 )
 
+data class SessionRequest(
+    @SerializedName("session_id")
+    val sessionId: Int
+)
+
+data class SessionResponse(
+    @SerializedName("session_id")
+    val sessionId: Int,
+    val status: String
+)
+
 data class PlaybackResponse(
     @SerializedName("session_id")
     val sessionId: Int,
@@ -213,4 +224,106 @@ data class PlaybackInfo(
     val url: String,
     @SerializedName("stream_name")
     val streamName: String
+)
+
+// EPG DTOs (M13)
+data class EpgProgramDto(
+    val id: Int,
+    val title: String,
+    @SerializedName("starts_at")
+    val startsAt: String,
+    @SerializedName("ends_at")
+    val endsAt: String,
+    val description: String? = null,
+    @SerializedName("channel_id")
+    val channelId: Int? = null
+)
+
+data class EpgNowNextDto(
+    @SerializedName("channel_id")
+    val channelId: Int,
+    val now: EpgProgramDto? = null,
+    val next: EpgProgramDto? = null,
+    val later: EpgProgramDto? = null
+)
+
+// M11 Sports DTOs
+data class CompetitionDto(
+    val id: Int,
+    val name: String,
+    val slug: String,
+    val sport: String,
+    @SerializedName("category_id")
+    val categoryId: Int? = null,
+    @SerializedName("external_id")
+    val externalId: String? = null,
+    @SerializedName("is_active")
+    val isActive: Boolean = true
+)
+
+data class TeamDto(
+    val id: Int,
+    val name: String,
+    val slug: String,
+    @SerializedName("competition_id")
+    val competitionId: Int? = null,
+    val logo: String? = null,
+    @SerializedName("external_id")
+    val externalId: String? = null,
+    @SerializedName("is_active")
+    val isActive: Boolean = true
+)
+
+data class MatchDto(
+    val id: Int,
+    @SerializedName("competition_id")
+    val competitionId: Int,
+    @SerializedName("home_team_id")
+    val homeTeamId: Int,
+    @SerializedName("away_team_id")
+    val awayTeamId: Int,
+    @SerializedName("channel_id")
+    val channelId: Int? = null,
+    val kickoff: String,
+    val status: String,
+    @SerializedName("home_score")
+    val homeScore: Int? = null,
+    @SerializedName("away_score")
+    val awayScore: Int? = null,
+    @SerializedName("external_id")
+    val externalId: String? = null,
+    @SerializedName("is_active")
+    val isActive: Boolean = true
+)
+
+data class MatchDetailsDto(
+    val id: Int,
+    @SerializedName("competition_id")
+    val competitionId: Int,
+    @SerializedName("competition_name")
+    val competitionName: String? = null,
+    @SerializedName("home_team_id")
+    val homeTeamId: Int,
+    @SerializedName("home_team_name")
+    val homeTeamName: String,
+    @SerializedName("home_team_logo")
+    val homeTeamLogo: String? = null,
+    @SerializedName("away_team_id")
+    val awayTeamId: Int,
+    @SerializedName("away_team_name")
+    val awayTeamName: String,
+    @SerializedName("away_team_logo")
+    val awayTeamLogo: String? = null,
+    @SerializedName("channel_id")
+    val channelId: Int? = null,
+    @SerializedName("channel_name")
+    val channelName: String? = null,
+    val kickoff: String,
+    val status: String,
+    @SerializedName("home_score")
+    val homeScore: Int? = null,
+    @SerializedName("away_score")
+    val awayScore: Int? = null,
+    @SerializedName("is_active")
+    val isActive: Boolean = true
 )

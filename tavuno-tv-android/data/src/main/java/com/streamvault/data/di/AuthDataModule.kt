@@ -5,8 +5,13 @@ import com.streamvault.data.remote.tavuno.AuthRepositoryImpl
 import com.streamvault.data.remote.tavuno.TavunoApiService
 import com.streamvault.data.remote.tavuno.TavunoAuthInterceptor
 import com.streamvault.data.remote.tavuno.TavunoCatalogRepository
+import com.streamvault.data.remote.tavuno.TavunoEpgRepository
+import com.streamvault.data.remote.tavuno.TavunoPlaybackSessionManager
+import com.streamvault.data.remote.tavuno.TavunoSportsMapper
+import com.streamvault.data.remote.tavuno.TavunoSportsRepository
 import com.streamvault.data.util.DeviceFingerprintGenerator
 import com.streamvault.domain.repository.AuthRepository
+import com.streamvault.domain.repository.TavunoPlaybackSessionRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -30,6 +35,9 @@ abstract class AuthDataModule {
 
     @Binds
     abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+
+    @Binds
+    abstract fun bindTavunoPlaybackSessionRepository(impl: TavunoPlaybackSessionManager): TavunoPlaybackSessionRepository
 
     companion object {
 
@@ -81,6 +89,29 @@ abstract class AuthDataModule {
             tokenStore: TokenStore
         ): TavunoCatalogRepository {
             return TavunoCatalogRepository(tavunoApiService, tokenStore)
+        }
+
+        @Provides
+        @Singleton
+        fun provideTavunoEpgRepository(
+            tavunoApiService: TavunoApiService
+        ): TavunoEpgRepository {
+            return TavunoEpgRepository(tavunoApiService)
+        }
+
+        @Provides
+        @Singleton
+        fun provideTavunoSportsMapper(): TavunoSportsMapper {
+            return TavunoSportsMapper()
+        }
+
+        @Provides
+        @Singleton
+        fun provideTavunoSportsRepository(
+            tavunoCatalogRepository: TavunoCatalogRepository,
+            sportsMapper: TavunoSportsMapper
+        ): TavunoSportsRepository {
+            return TavunoSportsRepository(tavunoCatalogRepository, sportsMapper)
         }
     }
 }

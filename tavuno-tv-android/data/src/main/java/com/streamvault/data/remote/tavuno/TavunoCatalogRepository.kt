@@ -259,10 +259,7 @@ class TavunoCatalogRepository @Inject constructor(
             if (token == null) {
                 return Result.error("Not authenticated")
             }
-            val response = tavunoApiService.authorizeLivePlayback(
-                channelId,
-                PlaybackRequest(deviceKey = null) // Device key handled by auth interceptor
-            )
+            val response = tavunoApiService.authorizeLivePlayback(channelId)
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
@@ -271,6 +268,156 @@ class TavunoCatalogRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Result.error(e.message ?: "Failed to authorize playback")
+        }
+    }
+
+    suspend fun heartbeatPlayback(sessionId: Int): Result<SessionResponse> {
+        return try {
+            val token = getAuthToken()
+            if (token == null) {
+                return Result.error("Not authenticated")
+            }
+            val response = tavunoApiService.heartbeatPlayback(SessionRequest(sessionId))
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.error(errorBody)
+            }
+        } catch (e: Exception) {
+            Result.error(e.message ?: "Failed to send heartbeat")
+        }
+    }
+
+    suspend fun stopPlayback(sessionId: Int): Result<SessionResponse> {
+        return try {
+            val token = getAuthToken()
+            if (token == null) {
+                return Result.error("Not authenticated")
+            }
+            val response = tavunoApiService.stopPlayback(SessionRequest(sessionId))
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.error(errorBody)
+            }
+        } catch (e: Exception) {
+            Result.error(e.message ?: "Failed to stop playback")
+        }
+    }
+
+    // M11 Sports methods
+
+    suspend fun getCompetitions(sport: String? = null): Result<List<CompetitionDto>> {
+        return try {
+            val token = getAuthToken()
+            if (token == null) {
+                return Result.error("Not authenticated")
+            }
+            val response = tavunoApiService.getCompetitions(sport)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.error(errorBody)
+            }
+        } catch (e: Exception) {
+            Result.error(e.message ?: "Failed to fetch competitions")
+        }
+    }
+
+    suspend fun getCompetition(competitionId: Int): Result<CompetitionDto> {
+        return try {
+            val token = getAuthToken()
+            if (token == null) {
+                return Result.error("Not authenticated")
+            }
+            val response = tavunoApiService.getCompetition(competitionId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.error(errorBody)
+            }
+        } catch (e: Exception) {
+            Result.error(e.message ?: "Failed to fetch competition")
+        }
+    }
+
+    suspend fun getCompetitionMatches(
+        competitionId: Int,
+        status: String? = null,
+        limit: Int = 100
+    ): Result<List<MatchDto>> {
+        return try {
+            val token = getAuthToken()
+            if (token == null) {
+                return Result.error("Not authenticated")
+            }
+            val response = tavunoApiService.getCompetitionMatches(competitionId, status, limit)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.error(errorBody)
+            }
+        } catch (e: Exception) {
+            Result.error(e.message ?: "Failed to fetch competition matches")
+        }
+    }
+
+    suspend fun getMatches(status: String? = null, limit: Int = 100): Result<List<MatchDto>> {
+        return try {
+            val token = getAuthToken()
+            if (token == null) {
+                return Result.error("Not authenticated")
+            }
+            val response = tavunoApiService.getMatches(status, limit)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.error(errorBody)
+            }
+        } catch (e: Exception) {
+            Result.error(e.message ?: "Failed to fetch matches")
+        }
+    }
+
+    suspend fun getMatch(matchId: Int): Result<MatchDto> {
+        return try {
+            val token = getAuthToken()
+            if (token == null) {
+                return Result.error("Not authenticated")
+            }
+            val response = tavunoApiService.getMatch(matchId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.error(errorBody)
+            }
+        } catch (e: Exception) {
+            Result.error(e.message ?: "Failed to fetch match")
+        }
+    }
+
+    suspend fun getMatchDetails(matchId: Int): Result<MatchDetailsDto> {
+        return try {
+            val token = getAuthToken()
+            if (token == null) {
+                return Result.error("Not authenticated")
+            }
+            val response = tavunoApiService.getMatchDetails(matchId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.error(errorBody)
+            }
+        } catch (e: Exception) {
+            Result.error(e.message ?: "Failed to fetch match details")
         }
     }
 }

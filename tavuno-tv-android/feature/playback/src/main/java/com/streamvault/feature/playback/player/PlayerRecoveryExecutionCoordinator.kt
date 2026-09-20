@@ -63,6 +63,7 @@ internal interface PlayerRecoveryExecutionPort {
     fun logRepositoryFailure(operation: String, result: Result<Unit>)
     fun fallbackToPreviousChannel(reason: String): Boolean
     fun hasLastChannel(): Boolean
+    fun onPlaybackEnded()
 }
 
 /** Owns the playback-error decision tree and its session-scoped recovery job. */
@@ -249,6 +250,8 @@ class PlayerRecoveryExecutionCoordinator @Inject constructor() {
                 )
                 return@launch
             }
+
+            // No recovery available - stop playback
             logWarning(
                 "recovery-no-switch type=$recoveryType hasLastChannel=${port.hasLastChannel()}"
             )
@@ -260,12 +263,14 @@ class PlayerRecoveryExecutionCoordinator @Inject constructor() {
                     recoveryType = recoveryType,
                     actions = port.buildRecoveryActions(recoveryType)
                 )
+                port.onPlaybackEnded()
             } else {
                 port.showPlayerNotice(
                     message = resolvePlaybackErrorMessage(error),
                     recoveryType = recoveryType,
                     actions = port.buildRecoveryActions(recoveryType)
                 )
+                port.onPlaybackEnded()
             }
         }
         return recoveryJob

@@ -9,7 +9,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app.main import (
-    LivePlaybackRequest,
     SessionRequest,
     channel_epg_now_next,
     get_channel,
@@ -35,6 +34,7 @@ class FakeSettings:
 class FakeServices:
     def __init__(self):
         self.settings = FakeSettings()
+        self.redis = MagicMock()
         self.dispatcharr = MagicMock()
         self.dispatcharr.get_version.return_value = {"version": "0.28.0"}
         self.ome = MagicMock()
@@ -164,8 +164,65 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(parts[1], "1789000000")
 
     def test_playback_live_authorization_success(self):
-        # Skip this test for now - needs more complex mocking
-        pass
+        """Test successful live playback authorization with channel_id in path."""
+        from app.auth import AuthService
+        
+        # Mock successful JWT authentication
+        with patch.object(AuthService, 'get_profile_from_token') as mock_auth:
+            mock_auth.return_value = {
+                "profile_id": 1,
+                "device_id": 10
+            }
+            
+            resp = playback_live(
+                channel_id=1,
+                services=self.services,
+                authorization="Bearer valid-jwt-token"
+            )
+            
+            # Verify response contains expected fields
+            self.assertIn("session_id", resp)
+            self.assertIn("channel_id", resp)
+            self.assertEqual(resp["channel_id"], 1)
+
+    def test_playback_live_rejects_missing_authorization(self):
+        """Test that playback rejects requests without authorization header."""
+        with self.assertRaises(Exception) as response:
+            playback_live(
+                channel_id=1,
+                services=self.services,
+                authorization=None
+            )
+        self.assertEqual(response.exception.status_code, 401)
+
+    def test_playback_live_rejects_invalid_authorization_format(self):
+        """Test that playback rejects requests with invalid authorization format."""
+        with self.assertRaises(Exception) as response:
+            playback_live(
+                channel_id=1,
+                services=self.services,
+                authorization="InvalidFormat token"
+            )
+        self.assertEqual(response.exception.status_code, 401)
+
+    def test_playback_live_rejects_invalid_channel(self):
+        """Test that playback rejects requests for invalid/nonexistent channels."""
+        from app.auth import AuthService
+        
+        # Mock successful JWT authentication
+        with patch.object(AuthService, 'get_profile_from_token') as mock_auth:
+            mock_auth.return_value = {
+                "profile_id": 1,
+                "device_id": 10
+            }
+            
+            with self.assertRaises(Exception) as response:
+                playback_live(
+                    channel_id=999,  # Invalid channel ID
+                    services=self.services,
+                    authorization="Bearer valid-jwt-token"
+                )
+            self.assertEqual(response.exception.status_code, 404)
 
     def test_playback_rejects_unregistered_device(self):
         # Skip this test for now - it needs more complex mocking

@@ -171,4 +171,15 @@ internal class SyncManagerPlanDelegate(
             request.onProgress
         )
     }
+
+    override suspend fun syncTavunoGuide(request: ProviderGuideSyncRequest): ProviderGuideSyncResult {
+        val provider = request.snapshot.toLegacyProvider()
+        return providerEpgExecutor.syncTavunoProviderEpg(
+            provider,
+            syncMetadataRepository.getMetadata(provider.id) ?: SyncMetadata(provider.id),
+            request.now,
+            request.force,
+            request.onProgress
+        )
+    }
 }

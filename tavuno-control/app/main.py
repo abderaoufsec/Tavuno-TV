@@ -274,11 +274,67 @@ def get_series_details(series_id: int, services: ServicesDependency) -> dict[str
     return series_details.model_dump()
 
 
-@app.get("/v1/sports", tags=["catalog"])
-def sports(services: ServicesDependency) -> list[dict[str, Any]]:
+@app.get("/v1/sports/competitions", tags=["catalog"])
+def list_competitions(services: ServicesDependency, sport: str | None = None) -> list[dict[str, Any]]:
+    """Get all active competitions, optionally filtered by sport (M11)."""
     catalog = CatalogService(services)
-    categories = catalog.get_categories(kind="sports")
-    return [category.model_dump() for category in categories]
+    competitions = catalog.get_competitions(sport=sport)
+    return [competition.model_dump() for competition in competitions]
+
+
+@app.get("/v1/sports/competitions/{competition_id}", tags=["catalog"])
+def get_competition(competition_id: int, services: ServicesDependency) -> dict[str, Any]:
+    """Get a specific competition by ID (M11)."""
+    catalog = CatalogService(services)
+    competition = catalog.get_competition(competition_id)
+    if competition is None:
+        raise HTTPException(status_code=404, detail="Competition not found")
+    return competition.model_dump()
+
+
+@app.get("/v1/sports/competitions/{competition_id}/matches", tags=["catalog"])
+def list_competition_matches(
+    competition_id: int,
+    services: ServicesDependency,
+    status: str | None = None,
+    limit: int = 100
+) -> list[dict[str, Any]]:
+    """Get matches for a specific competition, optionally filtered by status (M11)."""
+    catalog = CatalogService(services)
+    matches = catalog.get_matches(competition_id=competition_id, status=status, limit=limit)
+    return [match.model_dump() for match in matches]
+
+
+@app.get("/v1/sports/matches", tags=["catalog"])
+def list_matches(
+    services: ServicesDependency,
+    status: str | None = None,
+    limit: int = 100
+) -> list[dict[str, Any]]:
+    """Get all matches, optionally filtered by status (M11)."""
+    catalog = CatalogService(services)
+    matches = catalog.get_matches(status=status, limit=limit)
+    return [match.model_dump() for match in matches]
+
+
+@app.get("/v1/sports/matches/{match_id}", tags=["catalog"])
+def get_match(match_id: int, services: ServicesDependency) -> dict[str, Any]:
+    """Get a specific match by ID (M11)."""
+    catalog = CatalogService(services)
+    match = catalog.get_match(match_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return match.model_dump()
+
+
+@app.get("/v1/sports/matches/{match_id}/details", tags=["catalog"])
+def get_match_details(match_id: int, services: ServicesDependency) -> dict[str, Any]:
+    """Get detailed match information with team names and channel (M11)."""
+    catalog = CatalogService(services)
+    match_details = catalog.get_match_details(match_id)
+    if match_details is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return match_details.model_dump()
 
 
 @app.get("/v1/epg/channel/{channel_id}/now-next", tags=["epg"])
@@ -305,10 +361,6 @@ def channel_epg_now_next(channel_id: int, services: ServicesDependency) -> dict[
     }
 
 
-class LivePlaybackRequest(BaseModel):
-    channel_id: int
-
-
 class SessionRequest(BaseModel):
     session_id: int
 
@@ -316,7 +368,6 @@ class SessionRequest(BaseModel):
 @app.post("/v1/playback/live/{channel_id}", tags=["playback"])
 def playback_live(
     channel_id: int,
-    payload: LivePlaybackRequest,
     services: ServicesDependency,
     authorization: str | None = Header(None),
 ) -> dict[str, Any]:
