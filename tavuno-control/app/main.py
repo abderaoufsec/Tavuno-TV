@@ -268,42 +268,6 @@ def channel_epg_now_next(channel_id: int, services: ServicesDependency) -> dict[
     }
 
 
-class LoginRequest(BaseModel):
-    profile_id: int
-    device_key: str = Field(min_length=8, max_length=255)
-
-
-@app.post("/v1/auth/login", tags=["auth"])
-def login(payload: LoginRequest, services: ServicesDependency) -> dict[str, Any]:
-    """Authenticate profile and device, return JWT token (M7)."""
-    with database(services) as connection:
-        # Validate profile
-        profile = connection.execute(
-            "SELECT id FROM tavuno_profiles WHERE id = %s AND status = 'active'",
-            (payload.profile_id,),
-        ).fetchone()
-        if not profile:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Active profile not found")
-
-        # Validate device
-        device = connection.execute(
-            "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s AND is_active = TRUE",
-            (payload.device_key, payload.profile_id),
-        ).fetchone()
-        if not device:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Device not registered or inactive")
-
-        # Generate JWT token
-        token = generate_auth_token(payload.profile_id, device["id"])
-        
-        return {
-            "token": token,
-            "profile_id": payload.profile_id,
-            "device_id": device["id"],
-            "expires_in": JWT_EXPIRATION_HOURS * 3600,
-        }
-
-
 class LivePlaybackRequest(BaseModel):
     channel_id: int
 
@@ -334,7 +298,7 @@ def playback_live(
         auth_data = auth_service.get_profile_from_token(token)
         profile_id = auth_data["profile_id"]
         device_id = auth_data["device_id"]
-        
+
         # Get device_key from database
         with database(services) as connection:
             device = connection.execute(
@@ -343,9 +307,9 @@ def playback_live(
             ).fetchone()
             if not device:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
-            
+
             device_key = device["device_key"]
-            
+
             return authorize_live_playback(
                 profile_id=profile_id,
                 device_key=device_key,
@@ -355,6 +319,9 @@ def playback_live(
             )
     except HTTPException:
         raise
+    except ValueError as exc:
+        logger.exception("Playback authorization failed - invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
     except Exception as exc:
         logger.exception("Playback authorization failed")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authorization failed") from exc
