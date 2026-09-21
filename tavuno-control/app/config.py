@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     jwt_access_ttl_seconds: int = Field(default=900, validation_alias="JWT_ACCESS_TTL_SECONDS")
     jwt_refresh_ttl_seconds: int = Field(default=2592000, validation_alias="JWT_REFRESH_TTL_SECONDS")
     password_hash_scheme: str = Field(default="bcrypt", validation_alias="PASSWORD_HASH_SCHEME")
+    free_launch: bool = Field(default=True, validation_alias="FREE_LAUNCH")
+    default_plan_id: int | None = Field(default=None, validation_alias="DEFAULT_PLAN_ID")
 
     @property
     def postgres_dsn(self) -> str:

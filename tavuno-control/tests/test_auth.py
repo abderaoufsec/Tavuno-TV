@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from app.auth.password import hash_password, verify_password
 from app.auth.tokens import create_access_token, create_refresh_token, verify_token, decode_token
 from app.auth.service import AuthService
+from app.auth.models import RegisterRequest, ActivationRequest
 from app.config import Settings
 
 
@@ -162,6 +163,185 @@ class TestAuthService(unittest.TestCase):
         """Test login with revoked device - simplified."""
         # Skip complex integration test - will be tested via smoke test
         pass
+
+
+class TestRegistration(unittest.TestCase):
+    """Test account registration (M8.3)."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_services = Mock()
+        self.mock_services.settings = Settings(
+            jwt_secret="test-secret",
+            jwt_access_ttl_seconds=900,
+            jwt_refresh_ttl_seconds=2592000,
+            free_launch=True,
+            default_plan_id=1,
+        )
+        self.mock_services.connection = MagicMock()
+        self.auth_service = AuthService(self.mock_services)
+
+    def test_validate_email_valid(self):
+        """Test valid email validation."""
+        self.assertTrue(self.auth_service._validate_email("test@example.com"))
+        self.assertTrue(self.auth_service._validate_email("user.name+tag@domain.co.uk"))
+
+    def test_validate_email_invalid(self):
+        """Test invalid email validation."""
+        self.assertFalse(self.auth_service._validate_email("invalid-email"))
+        self.assertFalse(self.auth_service._validate_email("test@"))
+        self.assertFalse(self.auth_service._validate_email("@example.com"))
+
+    def test_validate_password_valid(self):
+        """Test valid password validation."""
+        # Should not raise exception
+        self.auth_service._validate_password("SecurePass123")
+
+    def test_validate_password_too_short(self):
+        """Test password validation rejects short passwords."""
+        with self.assertRaises(ValueError) as context:
+            self.auth_service._validate_password("123")
+        self.assertIn("8 characters", str(context.exception))
+
+    def test_register_free_launch(self):
+        """Test registration with FREE_LAUNCH=true."""
+        with self.mock_services.connection() as conn:
+            # First call: duplicate check (None)
+            # Second call: profile insert result
+            conn.execute.return_value.fetchone.side_effect = [None, {'id': 123}]
+
+        result = self.auth_service.register("testuser", "test@example.com", "SecurePass123")
+        self.assertEqual(result['profile_id'], 123)
+        self.assertEqual(result['status'], 'active')
+
+    def test_register_paid_mode(self):
+        """Test registration with FREE_LAUNCH=false."""
+        self.mock_services.settings.free_launch = False
+
+        with self.mock_services.connection() as conn:
+            # First call: duplicate check (None)
+            # Second call: profile insert result
+            conn.execute.return_value.fetchone.side_effect = [None, {'id': 123}]
+
+        result = self.auth_service.register("testuser", "test@example.com", "SecurePass123")
+        self.assertEqual(result['profile_id'], 123)
+        self.assertEqual(result['status'], 'inactive')
+
+    def test_register_duplicate_email(self):
+        """Test registration with duplicate email."""
+        with self.mock_services.connection() as conn:
+            # First call: duplicate check (returns profile ID)
+            conn.execute.return_value.fetchone.return_value = {'id': 1}
+
+        with self.assertRaises(ValueError) as context:
+            self.auth_service.register("testuser", "test@example.com", "SecurePass123")
+        self.assertIn("already registered", str(context.exception))
+
+    def test_register_invalid_email(self):
+        """Test registration with invalid email."""
+        with self.assertRaises(ValueError) as context:
+            self.auth_service.register("testuser", "invalid-email", "SecurePass123")
+        self.assertIn("Invalid email", str(context.exception))
+
+
+class TestAccountActivation(unittest.TestCase):
+    """Test account activation (M8.3)."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_services = Mock()
+        self.mock_services.settings = Settings(
+            jwt_secret="test-secret",
+            jwt_access_ttl_seconds=900,
+            jwt_refresh_ttl_seconds=2592000,
+        )
+        self.mock_services.connection = MagicMock()
+        self.auth_service = AuthService(self.mock_services)
+
+    def test_activate_account_success(self):
+        """Test successful account activation."""
+        with self.mock_services.connection() as conn:
+            # First call: profile check
+            # Second call: subscription check (None)
+            # Third call: subscription insert result
+            conn.execute.return_value.fetchone.side_effect = [
+                {'id': 123, 'status': 'inactive'},
+                None,
+                {'id': 456}
+            ]
+
+        result = self.auth_service.activate_account(123, 1, "payment_ref_123")
+        self.assertEqual(result['profile_id'], 123)
+        self.assertEqual(result['status'], 'active')
+        self.assertEqual(result['subscription_id'], 456)
+
+    def test_activate_account_not_found(self):
+        """Test activation of non-existent profile."""
+        with self.mock_services.connection() as conn:
+            conn.execute.return_value.fetchone.return_value = None  # Profile not found
+
+        with self.assertRaises(ValueError) as context:
+            self.auth_service.activate_account(999, 1, "payment_ref_123")
+        self.assertIn("not found", str(context.exception))
+
+    def test_activate_account_existing_subscription(self):
+        """Test activation when subscription already exists."""
+        with self.mock_services.connection() as conn:
+            conn.execute.return_value.fetchone.return_value = {'id': 123, 'status': 'inactive'}
+            conn.execute.return_value.fetchone.return_value = {'id': 456}  # Existing subscription
+
+        with self.assertRaises(ValueError) as context:
+            self.auth_service.activate_account(123, 1, "payment_ref_123")
+        self.assertIn("already exists", str(context.exception))
+
+
+class TestSubscription(unittest.TestCase):
+    """Test subscription retrieval (M8.3)."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_services = Mock()
+        self.mock_services.settings = Settings(
+            jwt_secret="test-secret",
+            jwt_access_ttl_seconds=900,
+            jwt_refresh_ttl_seconds=2592000,
+        )
+        self.mock_services.connection = MagicMock()
+        self.auth_service = AuthService(self.mock_services)
+
+    def test_get_subscription_active(self):
+        """Test getting active subscription."""
+        with self.mock_services.connection() as conn:
+            conn.execute.return_value.fetchone.return_value = {
+                'id': 456,
+                'status': 'active',
+                'starts_at': datetime.now(timezone.utc),
+                'ends_at': None,
+                'plan_id': 1,
+                'plan_name': 'Premium',
+                'plan_code': 'premium',
+                'max_devices': 4,
+                'max_concurrent_streams': 2
+            }
+            conn.execute.return_value.fetchall.return_value = [
+                {'resource_type': 'channel', 'resource_key': '123'}
+            ]
+
+        result = self.auth_service.get_subscription(123)
+        self.assertIsNotNone(result['subscription'])
+        self.assertEqual(result['subscription']['status'], 'active')
+        self.assertIsNotNone(result['plan'])
+        self.assertEqual(len(result['entitlements']), 1)
+
+    def test_get_subscription_none(self):
+        """Test getting subscription when none exists."""
+        with self.mock_services.connection() as conn:
+            conn.execute.return_value.fetchone.return_value = None  # No subscription
+
+        result = self.auth_service.get_subscription(123)
+        self.assertIsNone(result['subscription'])
+        self.assertIsNone(result['plan'])
+        self.assertEqual(len(result['entitlements']), 0)
 
 
 if __name__ == '__main__':

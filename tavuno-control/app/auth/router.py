@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.auth.service import AuthService
+from app.auth.models import RegisterRequest, RegisterResponse, ActivationRequest, ActivationResponse
 from app.services import Services
 
 
@@ -72,6 +73,14 @@ def login(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=str(e)
             )
+        if "account_inactive" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "ACCOUNT_INACTIVE",
+                    "message": "Your account is not activated yet. Please activate your subscription from your Tavuno account."
+                }
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
@@ -113,5 +122,81 @@ def get_current_user(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        )
+
+
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+def register(
+    request: RegisterRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """Register a new account."""
+    try:
+        return auth_service.register(request.username, request.email, request.password)
+    except ValueError as e:
+        error_msg = str(e).lower()
+        if "email" in error_msg and "registered" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(e)
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get("/subscription")
+def get_subscription(
+    auth_service: AuthService = Depends(get_auth_service),
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+):
+    """Get current subscription and entitlements."""
+    try:
+        profile = auth_service.get_profile_from_token(credentials.credentials)
+        return auth_service.get_subscription(profile['profile_id'])
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        )
+
+
+@router.post("/subscription/activate", response_model=ActivationResponse, status_code=status.HTTP_200_OK)
+def activate_account(
+    request: ActivationRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+):
+    """Activate an account (admin only)."""
+    try:
+        # Verify admin role
+        profile = auth_service.get_profile_from_token(credentials.credentials)
+        if profile.get('role') != 'admin':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required"
+            )
+
+        return auth_service.activate_account(
+            request.profile_id,
+            request.plan_id,
+            request.payment_reference
+        )
+    except ValueError as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e)
+            )
+        if "already exists" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(e)
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )

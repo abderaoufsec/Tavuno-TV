@@ -149,11 +149,16 @@ def authorize_live_playback(
     """
     # 1. Profile check
     profile = connection.execute(
-        "SELECT id, status FROM tavuno_profiles WHERE id = %s AND status = 'active'",
+        "SELECT id, status FROM tavuno_profiles WHERE id = %s",
         (profile_id,),
     ).fetchone()
     if not profile:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Active profile not found")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Profile not found")
+    if profile['status'] != 'active':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not active"
+        )
 
     # 2. Device check
     device = connection.execute(
