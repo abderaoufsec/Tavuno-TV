@@ -9,6 +9,8 @@ import re
 from app.services import Services
 from app.auth.password import hash_password, verify_password
 from app.auth.tokens import create_access_token, create_refresh_token, verify_token
+from app.auth.token_storage import TokenStorageService
+from app.auth.email_service import EmailService
 
 
 class AuthService:
@@ -16,6 +18,8 @@ class AuthService:
         self.services = services
         self.settings = services.settings
         self.redis = services.redis
+        self.token_storage = TokenStorageService(services.redis)
+        self.email_service = EmailService(services.settings)
 
     @contextmanager
     def _db(self):
@@ -235,6 +239,69 @@ class AuthService:
                     for e in entitlements
                 ]
             }
+
+    def request_password_reset(self, email: str) -> None:
+        """Request a password reset email."""
+        # Validate email format
+        if not self._validate_email(email):
+            raise ValueError("Invalid email format")
+
+        with self._db() as conn:
+            # Check if email exists (generic error to prevent enumeration)
+            profile = conn.execute(
+                "SELECT id, display_name FROM tavuno_profiles WHERE email = %s",
+                (email,)
+            ).fetchone()
+
+            if not profile:
+                # Return success anyway to prevent email enumeration
+                return
+
+            # Generate and store token
+            token = self.token_storage.store_password_reset_token(
+                profile['id'],
+                email,
+                self.settings.password_reset_ttl_seconds
+            )
+
+            # Send email
+            self.email_service.send_password_reset_email(
+                email,
+                profile['display_name'],
+                token
+            )
+
+    def confirm_password_reset(self, token: str, new_password: str) -> None:
+        """Confirm password reset with token."""
+        # Validate password strength
+        self._validate_password(new_password)
+
+        # Retrieve token
+        token_data = self.token_storage.get_password_reset_token(token)
+        if not token_data:
+            raise ValueError("Invalid or expired token")
+
+        profile_id = token_data['profile_id']
+        email = token_data['email']
+
+        with self._db() as conn:
+            # Update password
+            new_password_hash = hash_password(new_password)
+            conn.execute(
+                "UPDATE tavuno_profiles SET password_hash = %s WHERE id = %s",
+                (new_password_hash, profile_id)
+            )
+
+            # Invalidate all devices for this profile (security best practice)
+            conn.execute(
+                "UPDATE tavuno_devices SET revoked_at = NOW() WHERE profile = %s",
+                (profile_id,)
+            )
+
+            conn.commit()
+
+        # Delete token (single-use)
+        self.token_storage.delete_password_reset_token(token)
 
     def login(self, email: str, password: str, device_fingerprint: str, platform: str, ip: str) -> Dict[str, Any]:
         """Authenticate user and issue tokens."""

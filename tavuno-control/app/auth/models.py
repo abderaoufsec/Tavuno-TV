@@ -32,3 +32,14 @@ class ActivationResponse(BaseModel):
     profile_id: int
     status: str
     subscription_id: int
+
+
+class PasswordResetRequest(BaseModel):
+    """Request to initiate password reset."""
+    email: str = Field(min_length=5, max_length=255)
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Request to confirm password reset."""
+    token: str = Field(min_length=1, max_length=255)
+    new_password: str = Field(min_length=8, max_length=255)

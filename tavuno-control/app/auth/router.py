@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.auth.service import AuthService
-from app.auth.models import RegisterRequest, RegisterResponse, ActivationRequest, ActivationResponse
+from app.auth.models import RegisterRequest, RegisterResponse, ActivationRequest, ActivationResponse, PasswordResetRequest, PasswordResetConfirmRequest
 from app.services import Services
 
 
@@ -194,6 +194,56 @@ def activate_account(
         if "already exists" in error_msg:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
+                detail=str(e)
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/password-reset/request", status_code=status.HTTP_200_OK)
+def request_password_reset(
+    request: PasswordResetRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """Request a password reset email."""
+    try:
+        auth_service.request_password_reset(request.email)
+        # Always return success to prevent email enumeration
+        return {"message": "If the email exists, a password reset link has been sent"}
+    except ValueError as e:
+        # Validate email format but don't reveal if email exists
+        if "email" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
+def confirm_password_reset(
+    request: PasswordResetConfirmRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """Confirm password reset with token."""
+    try:
+        auth_service.confirm_password_reset(request.token, request.new_password)
+        return {"message": "Password has been reset successfully"}
+    except ValueError as e:
+        error_msg = str(e).lower()
+        if "token" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        if "password" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e)
             )
         raise HTTPException(

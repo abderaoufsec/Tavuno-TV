@@ -8,7 +8,8 @@ from datetime import datetime, timezone, timedelta
 from app.auth.password import hash_password, verify_password
 from app.auth.tokens import create_access_token, create_refresh_token, verify_token, decode_token
 from app.auth.service import AuthService
-from app.auth.models import RegisterRequest, ActivationRequest
+from app.auth.models import RegisterRequest, ActivationRequest, PasswordResetRequest, PasswordResetConfirmRequest
+from app.auth.token_storage import TokenStorageService
 from app.config import Settings
 
 
@@ -342,6 +343,87 @@ class TestSubscription(unittest.TestCase):
         self.assertIsNone(result['subscription'])
         self.assertIsNone(result['plan'])
         self.assertEqual(len(result['entitlements']), 0)
+
+
+class TestPasswordReset(unittest.TestCase):
+    """Test password reset functionality (M8.5)."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_services = Mock()
+        self.mock_services.settings = Settings(
+            jwt_secret="test-secret",
+            jwt_access_ttl_seconds=900,
+            jwt_refresh_ttl_seconds=2592000,
+            password_reset_ttl_seconds=3600,
+            email_enabled=False,
+        )
+        self.mock_services.connection = MagicMock()
+        self.mock_services.redis = Mock()
+        self.auth_service = AuthService(self.mock_services)
+        # Mock token storage
+        self.auth_service.token_storage = Mock(spec=TokenStorageService)
+
+    def test_request_password_reset_valid_email(self):
+        """Test password reset request with valid email."""
+        with self.mock_services.connection() as conn:
+            conn.execute.return_value.fetchone.return_value = {
+                'id': 123,
+                'display_name': 'testuser'
+            }
+
+        # Should not raise exception
+        self.auth_service.request_password_reset("test@example.com")
+
+    def test_request_password_reset_invalid_email(self):
+        """Test password reset request with invalid email."""
+        with self.assertRaises(ValueError) as context:
+            self.auth_service.request_password_reset("invalid-email")
+        self.assertIn("Invalid email", str(context.exception))
+
+    def test_request_password_reset_email_not_found(self):
+        """Test password reset request with non-existent email."""
+        with self.mock_services.connection() as conn:
+            conn.execute.return_value.fetchone.return_value = None  # Email not found
+
+        # Should not raise exception (prevents enumeration)
+        self.auth_service.request_password_reset("nonexistent@example.com")
+
+    def test_confirm_password_reset_valid_token(self):
+        """Test password reset confirmation with valid token."""
+        # Mock token storage
+        self.auth_service.token_storage.get_password_reset_token.return_value = {
+            'profile_id': 123,
+            'email': 'test@example.com',
+            'created_at': '2026-09-21T00:00:00Z'
+        }
+        self.auth_service.token_storage.delete_password_reset_token.return_value = True
+
+        with self.mock_services.connection() as conn:
+            conn.execute.return_value.fetchone.return_value = None
+
+        # Should not raise exception
+        self.auth_service.confirm_password_reset("valid_token", "NewSecurePass123")
+
+    def test_confirm_password_reset_invalid_token(self):
+        """Test password reset confirmation with invalid token."""
+        self.auth_service.token_storage.get_password_reset_token.return_value = None
+
+        with self.assertRaises(ValueError) as context:
+            self.auth_service.confirm_password_reset("invalid_token", "NewSecurePass123")
+        self.assertIn("token", str(context.exception).lower())
+
+    def test_confirm_password_reset_weak_password(self):
+        """Test password reset confirmation with weak password."""
+        self.auth_service.token_storage.get_password_reset_token.return_value = {
+            'profile_id': 123,
+            'email': 'test@example.com',
+            'created_at': '2026-09-21T00:00:00Z'
+        }
+
+        with self.assertRaises(ValueError) as context:
+            self.auth_service.confirm_password_reset("valid_token", "123")
+        self.assertIn("8 characters", str(context.exception))
 
 
 if __name__ == '__main__':

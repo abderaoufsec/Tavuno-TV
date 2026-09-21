@@ -38,6 +38,18 @@ class Settings(BaseSettings):
     free_launch: bool = Field(default=True, validation_alias="FREE_LAUNCH")
     default_plan_id: int | None = Field(default=None, validation_alias="DEFAULT_PLAN_ID")
 
+    # Email service (M8.5)
+    email_enabled: bool = Field(default=False, validation_alias="EMAIL_ENABLED")
+    email_from_address: str = Field(default="noreply@tavuno.com", validation_alias="EMAIL_FROM_ADDRESS")
+    email_from_name: str = Field(default="Tavuno", validation_alias="EMAIL_FROM_NAME")
+    email_smtp_host: str = Field(default="smtp.gmail.com", validation_alias="EMAIL_SMTP_HOST")
+    email_smtp_port: int = Field(default=587, validation_alias="EMAIL_SMTP_PORT")
+    email_smtp_username: str | None = Field(default=None, validation_alias="EMAIL_SMTP_USERNAME")
+    email_smtp_password: str | None = Field(default=None, validation_alias="EMAIL_SMTP_PASSWORD")
+    email_smtp_use_tls: bool = Field(default=True, validation_alias="EMAIL_SMTP_USE_TLS")
+    email_base_url: str = Field(default="https://tavuno.com", validation_alias="EMAIL_BASE_URL")
+    password_reset_ttl_seconds: int = Field(default=3600, validation_alias="PASSWORD_RESET_TTL_SECONDS")
+
     @property
     def postgres_dsn(self) -> str:
         return (
