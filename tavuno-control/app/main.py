@@ -493,6 +493,134 @@ def last_dispatcharr_sync(services: ServicesDependency) -> dict[str, Any]:
     return summary
 
 
+@app.post("/v1/playback/movie/{movie_id}", tags=["playback"])
+def playback_movie(
+    movie_id: int,
+    services: ServicesDependency,
+    authorization: str | None = Header(None),
+) -> dict[str, Any]:
+    """Authorize a movie playback stream with JWT authentication (M12)."""
+    if not authorization:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
+    
+    # Extract Bearer token
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
+    token = authorization.replace("Bearer ", "")
+    
+    try:
+        # Use AuthService to verify token and get profile
+        auth_service = AuthService(services)
+        auth_data = auth_service.get_profile_from_token(token)
+        profile_id = auth_data["profile_id"]
+        device_id = auth_data["device_id"]
+
+        # Get device_key from database
+        with database(services) as connection:
+            device = connection.execute(
+                "SELECT device_key FROM tavuno_devices WHERE id = %s AND profile = %s",
+                (device_id, profile_id),
+            ).fetchone()
+            if not device:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+
+            device_key = device["device_key"]
+
+            # Check if movie exists
+            movie = connection.execute(
+                "SELECT id, title, external_id, provider FROM tavuno_movies WHERE id = %s",
+                (movie_id,),
+            ).fetchone()
+            if not movie:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
+
+            # TODO: Implement proper VOD authorization similar to live playback
+            # For now, return basic authorization using Dispatcharr integration
+            return {
+                "authorized": True,
+                "movie_id": movie_id,
+                "title": movie["title"],
+                "provider": movie["provider"],
+                "external_id": movie["external_id"],
+                "message": "VOD playback authorization - TODO: implement full authorization logic"
+            }
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.exception("VOD playback authorization failed - invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
+    except Exception as exc:
+        logger.exception("VOD playback authorization failed")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authorization failed") from exc
+
+
+@app.post("/v1/playback/episode/{episode_id}", tags=["playback"])
+def playback_episode(
+    episode_id: int,
+    services: ServicesDependency,
+    authorization: str | None = Header(None),
+) -> dict[str, Any]:
+    """Authorize an episode playback stream with JWT authentication (M12)."""
+    if not authorization:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
+    
+    # Extract Bearer token
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
+    token = authorization.replace("Bearer ", "")
+    
+    try:
+        # Use AuthService to verify token and get profile
+        auth_service = AuthService(services)
+        auth_data = auth_service.get_profile_from_token(token)
+        profile_id = auth_data["profile_id"]
+        device_id = auth_data["device_id"]
+
+        # Get device_key from database
+        with database(services) as connection:
+            device = connection.execute(
+                "SELECT device_key FROM tavuno_devices WHERE id = %s AND profile = %s",
+                (device_id, profile_id),
+            ).fetchone()
+            if not device:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+
+            device_key = device["device_key"]
+
+            # Check if episode exists
+            episode = connection.execute(
+                """
+                SELECT e.id, e.title, e.season_id, s.series_id, s.title as series_title
+                FROM tavuno_episodes e
+                JOIN tavuno_seasons s ON s.id = e.season_id
+                WHERE e.id = %s
+                """,
+                (episode_id,),
+            ).fetchone()
+            if not episode:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found")
+
+            # TODO: Implement proper VOD authorization similar to live playback
+            # For now, return basic authorization using Dispatcharr integration
+            return {
+                "authorized": True,
+                "episode_id": episode_id,
+                "title": episode["title"],
+                "series_id": episode["series_id"],
+                "series_title": episode["series_title"],
+                "season_id": episode["season_id"],
+                "message": "VOD playback authorization - TODO: implement full authorization logic"
+            }
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.exception("VOD playback authorization failed - invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
+    except Exception as exc:
+        logger.exception("VOD playback authorization failed")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authorization failed") from exc
+
+
 @app.get("/v1/media/verify", tags=["media"])
 def verify_media_token(token: str, services: ServicesDependency) -> dict[str, Any]:
     """Verify a playback token for media-layer authorization (M7)."""

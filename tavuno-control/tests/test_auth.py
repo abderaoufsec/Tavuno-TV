@@ -209,7 +209,9 @@ class TestRegistration(unittest.TestCase):
         with self.mock_services.connection() as conn:
             # First call: duplicate check (None)
             # Second call: profile insert result
-            conn.execute.return_value.fetchone.side_effect = [None, {'id': 123}]
+            # Third call: subscription insert result  
+            conn.execute.return_value.fetchone.side_effect = [None, {'id': 123}, {'id': 456}]
+            conn.execute.return_value.fetchall.return_value = [[]]
 
         result = self.auth_service.register("testuser", "test@example.com", "SecurePass123")
         self.assertEqual(result['profile_id'], 123)
