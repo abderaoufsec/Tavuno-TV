@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .config import get_settings
-from .playback import authorize_live_playback, heartbeat_session, stop_session, generate_auth_token, verify_playback_token
+from .playback import authorize_live_playback, authorize_movie_playback, authorize_episode_playback, heartbeat_session, stop_session, generate_auth_token, verify_playback_token
 from .services import Services
 from .auth.router import router as auth_router
 from .devices.router import router as devices_router
@@ -274,6 +274,24 @@ def get_series_details(series_id: int, services: ServicesDependency) -> dict[str
     return series_details.model_dump()
 
 
+@app.get("/v1/series/{series_id}/seasons", tags=["catalog"])
+def get_series_seasons(series_id: int, services: ServicesDependency) -> list[dict[str, Any]]:
+    """Get seasons for a specific series (M12)."""
+    catalog = CatalogService(services)
+    series_details = catalog.get_series_details(series_id)
+    if series_details is None:
+        raise HTTPException(status_code=404, detail="Series not found")
+    return series_details.seasons if series_details.seasons else []
+
+
+@app.get("/v1/seasons/{season_id}/episodes", tags=["catalog"])
+def get_season_episodes(season_id: int, services: ServicesDependency) -> list[dict[str, Any]]:
+    """Get episodes for a specific season (M12)."""
+    catalog = CatalogService(services)
+    episodes = catalog.get_season_episodes(season_id)
+    return episodes
+
+
 @app.get("/v1/sports/competitions", tags=["catalog"])
 def list_competitions(services: ServicesDependency, sport: str | None = None) -> list[dict[str, Any]]:
     """Get all active competitions, optionally filtered by sport (M11)."""
@@ -526,31 +544,20 @@ def playback_movie(
 
             device_key = device["device_key"]
 
-            # Check if movie exists
-            movie = connection.execute(
-                "SELECT id, title, external_id, provider FROM tavuno_movies WHERE id = %s",
-                (movie_id,),
-            ).fetchone()
-            if not movie:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
-
-            # TODO: Implement proper VOD authorization similar to live playback
-            # For now, return basic authorization using Dispatcharr integration
-            return {
-                "authorized": True,
-                "movie_id": movie_id,
-                "title": movie["title"],
-                "provider": movie["provider"],
-                "external_id": movie["external_id"],
-                "message": "VOD playback authorization - TODO: implement full authorization logic"
-            }
+            return authorize_movie_playback(
+                profile_id=profile_id,
+                device_key=device_key,
+                movie_id=movie_id,
+                connection=connection,
+                settings=services.settings,
+            )
     except HTTPException:
         raise
     except ValueError as exc:
-        logger.exception("VOD playback authorization failed - invalid token")
+        logger.exception("Movie playback authorization failed - invalid token")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
     except Exception as exc:
-        logger.exception("VOD playback authorization failed")
+        logger.exception("Movie playback authorization failed")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authorization failed") from exc
 
 
@@ -587,37 +594,20 @@ def playback_episode(
 
             device_key = device["device_key"]
 
-            # Check if episode exists
-            episode = connection.execute(
-                """
-                SELECT e.id, e.title, e.season_id, s.series_id, s.title as series_title
-                FROM tavuno_episodes e
-                JOIN tavuno_seasons s ON s.id = e.season_id
-                WHERE e.id = %s
-                """,
-                (episode_id,),
-            ).fetchone()
-            if not episode:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found")
-
-            # TODO: Implement proper VOD authorization similar to live playback
-            # For now, return basic authorization using Dispatcharr integration
-            return {
-                "authorized": True,
-                "episode_id": episode_id,
-                "title": episode["title"],
-                "series_id": episode["series_id"],
-                "series_title": episode["series_title"],
-                "season_id": episode["season_id"],
-                "message": "VOD playback authorization - TODO: implement full authorization logic"
-            }
+            return authorize_episode_playback(
+                profile_id=profile_id,
+                device_key=device_key,
+                episode_id=episode_id,
+                connection=connection,
+                settings=services.settings,
+            )
     except HTTPException:
         raise
     except ValueError as exc:
-        logger.exception("VOD playback authorization failed - invalid token")
+        logger.exception("Episode playback authorization failed - invalid token")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
     except Exception as exc:
-        logger.exception("VOD playback authorization failed")
+        logger.exception("Episode playback authorization failed")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authorization failed") from exc
 
 

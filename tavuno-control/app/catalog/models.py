@@ -15,7 +15,10 @@ Database schema mapping:
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import ForwardRef
 
 
 class Channel(BaseModel):
@@ -109,6 +112,18 @@ class MovieDetails(BaseModel):
     playback_available: bool = True
 
 
+class SeasonDetails(BaseModel):
+    """Season details for series content (M12).
+
+    Provides season-level information with episode metadata.
+    """
+    id: int
+    season_number: int
+    name: str
+    poster: Optional[str] = None
+    episode_count: int
+
+
 class SeriesDetails(BaseModel):
     """Extended series details for content detail screens (M12).
 
@@ -125,20 +140,9 @@ class SeriesDetails(BaseModel):
     backdrop: Optional[str] = None
     release_year: Optional[int] = None
     category_name: Optional[str] = None
-    seasons: Optional[List[Dict[str, Any]]] = None
+    seasons: Optional[List[SeasonDetails]] = None
     episode_count: Optional[int] = None
     playback_available: bool = True
-
-
-class SeasonDetails(BaseModel):
-    """Season details for series content (M12).
-
-    Provides season-level information with episode metadata.
-    """
-    season_number: int
-    name: str
-    episode_count: int
-    episodes: Optional[List[Dict[str, Any]]] = None
 
 
 class EpisodeDetails(BaseModel):

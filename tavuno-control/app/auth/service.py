@@ -455,11 +455,25 @@ class AuthService:
                 self.settings.jwt_refresh_ttl_seconds
             )
 
+            # Get profile for response
+            profile = conn.execute(
+                "SELECT id, email, display_name FROM tavuno_profiles WHERE id = %s",
+                (profile_id,)
+            ).fetchone()
+
+            if not profile:
+                raise ValueError('Profile not found')
+
             return {
                 'access_token': new_access,
                 'refresh_token': new_refresh,
                 'access_expires_at': (time.time() + self.settings.jwt_access_ttl_seconds),
                 'refresh_expires_at': (time.time() + self.settings.jwt_refresh_ttl_seconds),
+                'profile': {
+                    'id': profile['id'],
+                    'email': profile['email'],
+                    'display_name': profile['display_name'],
+                }
             }
 
     def logout(self, refresh_token: str) -> None:

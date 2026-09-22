@@ -12,12 +12,12 @@ The service:
 - Does not integrate with Dispatcharr (future milestone)
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 
 from .models import (
     Channel, Category, Movie, Series,
-    ChannelDetails, MovieDetails, SeriesDetails,
+    ChannelDetails, MovieDetails, SeriesDetails, SeasonDetails,
     Competition, Team, Match, MatchDetails
 )
 
@@ -466,6 +466,46 @@ class CatalogService:
         if row is None:
             return None
 
+        # Fetch seasons with episode counts
+        seasons_data = []
+        episode_count = 0
+        try:
+            with self._db() as conn:
+                seasons = conn.execute(
+                    """
+                    SELECT id, season_number, title, poster
+                    FROM tavuno_seasons
+                    WHERE series = %s AND is_active = TRUE
+                    ORDER BY season_number
+                    """,
+                    (series_id,),
+                ).fetchall()
+
+                for season_row in seasons:
+                    # Count episodes for this season
+                    episode_count_row = conn.execute(
+                        """
+                        SELECT COUNT(*) as count
+                        FROM tavuno_episodes
+                        WHERE season = %s AND is_active = TRUE
+                        """,
+                        (season_row["id"],),
+                    ).fetchone()
+
+                    season_episode_count = episode_count_row["count"] if episode_count_row else 0
+                    episode_count += season_episode_count
+
+                    seasons_data.append(SeasonDetails(
+                        id=season_row["id"],
+                        season_number=season_row["season_number"],
+                        name=season_row["title"],
+                        poster=str(season_row["poster"]) if season_row.get("poster") else None,
+                        episode_count=season_episode_count
+                    ))
+        except Exception:
+            # Tables might not exist yet
+            pass
+
         return SeriesDetails(
             id=row["id"],
             title=row["title"],
@@ -477,10 +517,46 @@ class CatalogService:
             backdrop=None,  # No backdrop field in current schema
             release_year=None,  # No release_year field in current schema
             category_name=row.get("category_name"),
-            seasons=None,  # No seasons data in current schema
-            episode_count=None,  # No episode data in current schema
+            seasons=seasons_data if seasons_data else None,
+            episode_count=episode_count if episode_count > 0 else None,
             playback_available=True,  # Assume available if active
         )
+
+    def get_season_episodes(self, season_id: int) -> List[Dict[str, Any]]:
+        """Get episodes for a specific season (M12).
+
+        Args:
+            season_id: Season ID
+
+        Returns:
+            List of episode dictionaries
+        """
+        try:
+            with self._db() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, episode_number, title, synopsis, duration, thumbnail
+                    FROM tavuno_episodes
+                    WHERE season = %s AND is_active = TRUE
+                    ORDER BY episode_number
+                    """,
+                    (season_id,),
+                ).fetchall()
+
+            return [
+                {
+                    "id": row["id"],
+                    "episode_number": row["episode_number"],
+                    "title": row["title"],
+                    "synopsis": row.get("synopsis"),
+                    "duration": row.get("duration"),
+                    "thumbnail": str(row["thumbnail"]) if row.get("thumbnail") else None,
+                }
+                for row in rows
+            ]
+        except Exception:
+            # Table might not exist yet
+            return []
 
     # M11 Sports service methods
 
@@ -493,28 +569,32 @@ class CatalogService:
         Returns:
             List of Competition models
         """
-        with self._db() as conn:
-            if sport:
-                rows = conn.execute(
-                    """
-                    SELECT id, name, slug, sport, category, external_id, is_active
-                    FROM tavuno_competitions
-                    WHERE sport = %s AND is_active = TRUE
-                    ORDER BY name
-                    """,
-                    (sport,),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT id, name, slug, sport, category, external_id, is_active
-                    FROM tavuno_competitions
-                    WHERE is_active = TRUE
-                    ORDER BY sport, name
-                    """,
-                ).fetchall()
+        try:
+            with self._db() as conn:
+                if sport:
+                    rows = conn.execute(
+                        """
+                        SELECT id, name, slug, sport, category, external_id, is_active
+                        FROM tavuno_competitions
+                        WHERE sport = %s AND is_active = TRUE
+                        ORDER BY name
+                        """,
+                        (sport,),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT id, name, slug, sport, category, external_id, is_active
+                        FROM tavuno_competitions
+                        WHERE is_active = TRUE
+                        ORDER BY sport, name
+                        """,
+                    ).fetchall()
 
-        return [self._map_competition(row) for row in rows]
+            return [self._map_competition(row) for row in rows]
+        except Exception as e:
+            # Table might not exist or other error
+            return []
 
     def get_competition(self, competition_id: int) -> Optional[Competition]:
         """Get a specific competition by ID (M11).
@@ -588,28 +668,32 @@ class CatalogService:
         Returns:
             List of Match models
         """
-        with self._db() as conn:
-            query = """
-                SELECT id, competition, home_team, away_team, channel, kickoff, status, home_score, away_score, external_id, is_active
-                FROM tavuno_matches
-                WHERE is_active = TRUE
-            """
-            params = []
+        try:
+            with self._db() as conn:
+                query = """
+                    SELECT id, competition, home_team, away_team, channel, kickoff, status, home_score, away_score, external_id, is_active
+                    FROM tavuno_matches
+                    WHERE is_active = TRUE
+                """
+                params = []
 
-            if competition_id:
-                query += " AND competition = %s"
-                params.append(competition_id)
+                if competition_id:
+                    query += " AND competition = %s"
+                    params.append(competition_id)
 
-            if status:
-                query += " AND status = %s"
-                params.append(status)
+                if status:
+                    query += " AND status = %s"
+                    params.append(status)
 
-            query += " ORDER BY kickoff DESC LIMIT %s"
-            params.append(limit)
+                query += " ORDER BY kickoff DESC LIMIT %s"
+                params.append(limit)
 
-            rows = conn.execute(query, tuple(params)).fetchall()
+                rows = conn.execute(query, tuple(params)).fetchall()
 
-        return [self._map_match(row) for row in rows]
+            return [self._map_match(row) for row in rows]
+        except Exception as e:
+            # Table might not exist or other error
+            return []
 
     def get_match(self, match_id: int) -> Optional[Match]:
         """Get a specific match by ID (M11).

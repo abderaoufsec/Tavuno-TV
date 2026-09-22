@@ -381,3 +381,355 @@ def stop_session(session_id: int, connection: Any) -> dict[str, Any]:
     connection.commit()
 
     return {"session_id": row["id"], "status": "stopped"}
+
+
+def authorize_movie_playback(
+    profile_id: int,
+    device_key: str,
+    movie_id: int,
+    connection: Any,
+    settings: Any,
+) -> dict[str, Any]:
+    """
+    Execute full playback authorization pipeline for a movie (M12).
+    1. Authenticate profile
+    2. Validate registered device
+    3. Validate subscription & entitlement
+    4. Enforce concurrency limits
+    5. Resolve movie and stream URL
+    6. Record playback session
+    7. Return short-lived signed media URL
+    """
+    # 1. Profile check
+    profile = connection.execute(
+        "SELECT id, status FROM tavuno_profiles WHERE id = %s",
+        (profile_id,),
+    ).fetchone()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Profile not found")
+    if profile['status'] != 'active':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not active"
+        )
+
+    # 2. Device check
+    device = connection.execute(
+        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+        (device_key, profile_id),
+    ).fetchone()
+    if not device or not device["is_active"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Device is not registered or active for this profile",
+        )
+
+    # 3. Subscription & entitlement check
+    sub = connection.execute(
+        """
+        SELECT s.id, p.max_concurrent_streams, p.max_devices
+        FROM tavuno_subscriptions s
+        JOIN tavuno_plans p ON p.id = s.plan
+        WHERE s.profile = %s AND s.status = 'active'
+          AND (s.ends_at IS NULL OR s.ends_at > NOW())
+        ORDER BY s.id DESC LIMIT 1
+        """,
+        (profile_id,),
+    ).fetchone()
+
+    if not sub:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Active subscription required for playback",
+        )
+
+    max_concurrent = sub["max_concurrent_streams"]
+    max_devices = sub["max_devices"]
+
+    # Check device limit
+    device_count = connection.execute(
+        """
+        SELECT COUNT(*) AS count FROM tavuno_devices
+        WHERE profile = %s AND is_active = TRUE
+        """,
+        (profile_id,),
+    ).fetchone()
+    
+    # Check if this specific device is already registered
+    current_device = connection.execute(
+        "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+        (device_key, profile_id),
+    ).fetchone()
+    
+    # If device not registered and at device limit, block
+    if not current_device and device_count and device_count["count"] >= max_devices:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Device limit reached ({max_devices} devices). Register this device first.",
+        )
+    
+    # Auto-register device if not registered but under limit
+    if not current_device:
+        device_row = connection.execute(
+            """
+            INSERT INTO tavuno_devices (profile, name, device_key, platform, is_active, last_seen_at)
+            VALUES (%s, 'Auto-registered Device', %s, 'unknown', TRUE, NOW())
+            RETURNING id
+            """,
+            (profile_id, device_key),
+        ).fetchone()
+        device_id = device_row["id"]
+    else:
+        device_id = current_device["id"]
+
+    # 4. Enforce concurrent stream limit
+    active_sessions = connection.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM tavuno_playback_sessions
+        WHERE profile = %s AND status = 'active' AND last_seen_at >= NOW() - INTERVAL '90 SECONDS'
+        """,
+        (profile_id,),
+    ).fetchone()
+
+    if active_sessions and active_sessions["count"] >= max_concurrent:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Concurrent playback stream limit reached ({max_concurrent} active streams)",
+        )
+
+    # 5. Resolve movie
+    movie = connection.execute(
+        "SELECT id, title, slug, stream_url FROM tavuno_movies WHERE id = %s AND is_active = TRUE",
+        (movie_id,),
+    ).fetchone()
+    if not movie:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found or inactive")
+
+    # Check if movie has a stream URL
+    if not movie["stream_url"]:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Movie stream URL not available. Please try again later or contact support.",
+        )
+
+    # 6. Create session
+    ttl = settings.playback_token_ttl_seconds
+    session_row = connection.execute(
+        """
+        INSERT INTO tavuno_playback_sessions (profile, device, content_type, content_key, status, expires_at, last_seen_at)
+        VALUES (%s, %s, 'movie', %s, 'active', NOW() + (%s || ' seconds')::interval, NOW())
+        RETURNING id, expires_at
+        """,
+        (profile_id, device_id, str(movie_id), ttl),
+    ).fetchone()
+    connection.commit()
+
+    session_id = session_row["id"]
+    expires_at_dt = session_row["expires_at"]
+    expires_ts = int(time.time()) + ttl
+
+    # 7. Mint token
+    token = mint_token(
+        session_id=session_id,
+        device_id=device_id,
+        content_type="movie",
+        content_key=str(movie_id),
+        expires_at=expires_ts,
+        secret=settings.playback_token_secret,
+    )
+
+    # Use the stream URL directly (no OME wrapping for VOD)
+    playback_url = f"{movie['stream_url']}?token={token}"
+
+    return {
+        "session_id": session_id,
+        "movie_id": movie_id,
+        "title": movie["title"],
+        "expires_at": expires_at_dt.isoformat() if hasattr(expires_at_dt, "isoformat") else str(expires_at_dt),
+        "playback": {
+            "protocol": "hls",
+            "url": playback_url,
+            "stream_name": f"movie_{movie_id}",
+        },
+    }
+
+
+def authorize_episode_playback(
+    profile_id: int,
+    device_key: str,
+    episode_id: int,
+    connection: Any,
+    settings: Any,
+) -> dict[str, Any]:
+    """
+    Execute full playback authorization pipeline for an episode (M12).
+    1. Authenticate profile
+    2. Validate registered device
+    3. Validate subscription & entitlement
+    4. Enforce concurrency limits
+    5. Resolve episode and stream URL
+    6. Record playback session
+    7. Return short-lived signed media URL
+    """
+    # 1. Profile check
+    profile = connection.execute(
+        "SELECT id, status FROM tavuno_profiles WHERE id = %s",
+        (profile_id,),
+    ).fetchone()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Profile not found")
+    if profile['status'] != 'active':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not active"
+        )
+
+    # 2. Device check
+    device = connection.execute(
+        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+        (device_key, profile_id),
+    ).fetchone()
+    if not device or not device["is_active"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Device is not registered or active for this profile",
+        )
+
+    # 3. Subscription & entitlement check
+    sub = connection.execute(
+        """
+        SELECT s.id, p.max_concurrent_streams, p.max_devices
+        FROM tavuno_subscriptions s
+        JOIN tavuno_plans p ON p.id = s.plan
+        WHERE s.profile = %s AND s.status = 'active'
+          AND (s.ends_at IS NULL OR s.ends_at > NOW())
+        ORDER BY s.id DESC LIMIT 1
+        """,
+        (profile_id,),
+    ).fetchone()
+
+    if not sub:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Active subscription required for playback",
+        )
+
+    max_concurrent = sub["max_concurrent_streams"]
+    max_devices = sub["max_devices"]
+
+    # Check device limit
+    device_count = connection.execute(
+        """
+        SELECT COUNT(*) AS count FROM tavuno_devices
+        WHERE profile = %s AND is_active = TRUE
+        """,
+        (profile_id,),
+    ).fetchone()
+    
+    # Check if this specific device is already registered
+    current_device = connection.execute(
+        "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+        (device_key, profile_id),
+    ).fetchone()
+    
+    # If device not registered and at device limit, block
+    if not current_device and device_count and device_count["count"] >= max_devices:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Device limit reached ({max_devices} devices). Register this device first.",
+        )
+    
+    # Auto-register device if not registered but under limit
+    if not current_device:
+        device_row = connection.execute(
+            """
+            INSERT INTO tavuno_devices (profile, name, device_key, platform, is_active, last_seen_at)
+            VALUES (%s, 'Auto-registered Device', %s, 'unknown', TRUE, NOW())
+            RETURNING id
+            """,
+            (profile_id, device_key),
+        ).fetchone()
+        device_id = device_row["id"]
+    else:
+        device_id = current_device["id"]
+
+    # 4. Enforce concurrent stream limit
+    active_sessions = connection.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM tavuno_playback_sessions
+        WHERE profile = %s AND status = 'active' AND last_seen_at >= NOW() - INTERVAL '90 SECONDS'
+        """,
+        (profile_id,),
+    ).fetchone()
+
+    if active_sessions and active_sessions["count"] >= max_concurrent:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Concurrent playback stream limit reached ({max_concurrent} active streams)",
+        )
+
+    # 5. Resolve episode
+    episode = connection.execute(
+        """
+        SELECT e.id, e.title, e.episode_number, e.stream_url, s.id as season_id, s.series_id, s.title as series_title
+        FROM tavuno_episodes e
+        JOIN tavuno_seasons s ON s.id = e.season
+        WHERE e.id = %s AND e.is_active = TRUE
+        """,
+        (episode_id,),
+    ).fetchone()
+    if not episode:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found or inactive")
+
+    # Check if episode has a stream URL
+    if not episode["stream_url"]:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Episode stream URL not available. Please try again later or contact support.",
+        )
+
+    # 6. Create session
+    ttl = settings.playback_token_ttl_seconds
+    session_row = connection.execute(
+        """
+        INSERT INTO tavuno_playback_sessions (profile, device, content_type, content_key, status, expires_at, last_seen_at)
+        VALUES (%s, %s, 'episode', %s, 'active', NOW() + (%s || ' seconds')::interval, NOW())
+        RETURNING id, expires_at
+        """,
+        (profile_id, device_id, str(episode_id), ttl),
+    ).fetchone()
+    connection.commit()
+
+    session_id = session_row["id"]
+    expires_at_dt = session_row["expires_at"]
+    expires_ts = int(time.time()) + ttl
+
+    # 7. Mint token
+    token = mint_token(
+        session_id=session_id,
+        device_id=device_id,
+        content_type="episode",
+        content_key=str(episode_id),
+        expires_at=expires_ts,
+        secret=settings.playback_token_secret,
+    )
+
+    # Use the stream URL directly (no OME wrapping for VOD)
+    playback_url = f"{episode['stream_url']}?token={token}"
+
+    return {
+        "session_id": session_id,
+        "episode_id": episode_id,
+        "title": episode["title"],
+        "series_id": episode["series_id"],
+        "series_title": episode["series_title"],
+        "season_id": episode["season_id"],
+        "expires_at": expires_at_dt.isoformat() if hasattr(expires_at_dt, "isoformat") else str(expires_at_dt),
+        "playback": {
+            "protocol": "hls",
+            "url": playback_url,
+            "stream_name": f"episode_{episode_id}",
+        },
+    }

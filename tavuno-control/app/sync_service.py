@@ -496,23 +496,34 @@ class SyncService:
             synopsis = movie.get("description") or movie.get("plot") or movie.get("synopsis")
             year = _int(movie.get("year") or movie.get("release_year"))
             category_id = self._vod_category_id(movie, category_map)
+            
+            # Fetch stream URL for this movie
+            stream_url = None
+            try:
+                streams = self.client.get_movie_streams(movie_id)
+                if streams and len(streams) > 0:
+                    # Get the first available stream URL
+                    stream_url = streams[0].get("url") or streams[0].get("stream_url") or streams[0].get("direct_source")
+            except Exception as exc:
+                logger.debug("Could not fetch stream URL for movie %s: %s", movie_id, exc)
+            
             existing = connection.execute("SELECT id FROM tavuno_movies WHERE slug = %s", (slug,)).fetchone()
             if existing:
                 connection.execute(
                     """
                     UPDATE tavuno_movies
-                    SET title = %s, category = COALESCE(%s, category), synopsis = %s, release_year = %s, is_active = TRUE
+                    SET title = %s, category = COALESCE(%s, category), synopsis = %s, release_year = %s, stream_url = %s, is_active = TRUE
                     WHERE id = %s
                     """,
-                    (title, category_id, synopsis, year, existing["id"]),
+                    (title, category_id, synopsis, year, stream_url, existing["id"]),
                 )
                 continue
             connection.execute(
                 """
-                INSERT INTO tavuno_movies (title, slug, category, synopsis, release_year, is_active)
-                VALUES (%s, %s, %s, %s, %s, TRUE)
+                INSERT INTO tavuno_movies (title, slug, category, synopsis, release_year, stream_url, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE)
                 """,
-                (title, slug, category_id, synopsis, year),
+                (title, slug, category_id, synopsis, year, stream_url),
             )
             synced += 1
         
@@ -639,22 +650,35 @@ class SyncService:
                 (season_id, episode_number),
             ).fetchone()
             synopsis = episode.get("description") or episode.get("plot") or ""
+            
+            # Fetch stream URL for this episode
+            episode_id = _int(episode.get("id"))
+            stream_url = None
+            if episode_id:
+                try:
+                    streams = self.client.get_episode_streams(episode_id)
+                    if streams and len(streams) > 0:
+                        # Get the first available stream URL
+                        stream_url = streams[0].get("url") or streams[0].get("stream_url") or streams[0].get("direct_source")
+                except Exception as exc:
+                    logger.debug("Could not fetch stream URL for episode %s: %s", episode_id, exc)
+            
             if existing:
                 connection.execute(
                     """
                     UPDATE tavuno_episodes
-                    SET title = %s, synopsis = %s, is_active = TRUE
+                    SET title = %s, synopsis = %s, stream_url = %s, is_active = TRUE
                     WHERE id = %s
                     """,
-                    (title, synopsis, existing["id"]),
+                    (title, synopsis, stream_url, existing["id"]),
                 )
                 continue
             connection.execute(
                 """
-                INSERT INTO tavuno_episodes (season, episode_number, title, synopsis, is_active)
-                VALUES (%s, %s, %s, %s, TRUE)
+                INSERT INTO tavuno_episodes (season, episode_number, title, synopsis, stream_url, is_active)
+                VALUES (%s, %s, %s, %s, %s, TRUE)
                 """,
-                (season_id, episode_number, title, synopsis),
+                (season_id, episode_number, title, synopsis, stream_url),
             )
             synced += 1
         logger.info("VOD episodes sync: %d episodes processed", synced)

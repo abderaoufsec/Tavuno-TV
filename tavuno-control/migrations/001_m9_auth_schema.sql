@@ -1,6 +1,7 @@
 -- M9 Migration: Extend tavuno_profiles and tavuno_devices for authentication
 -- Add email, password_hash, role to tavuno_profiles
 -- Add device_fingerprint, last_seen_at, revoked_at, platform to tavuno_devices
+-- Make directus_user nullable to allow registration
 
 -- Add email column if not exists
 DO $$
@@ -24,6 +25,17 @@ BEGIN
         WHERE table_name = 'tavuno_profiles' AND column_name = 'role'
     ) THEN
         ALTER TABLE tavuno_profiles ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
+    END IF;
+END $$;
+
+-- Make directus_user nullable if it exists
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'tavuno_profiles' AND column_name = 'directus_user'
+    ) THEN
+        ALTER TABLE tavuno_profiles ALTER COLUMN directus_user DROP NOT NULL;
     END IF;
 END $$;
 

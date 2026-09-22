@@ -125,3 +125,33 @@ class DispatcharrClient:
 
     def get_all_episodes(self, max_pages: int = 50) -> list[dict[str, Any]]:
         return self.get_paginated("/api/vod/episodes/", max_pages=max_pages)
+
+    def get_episode_streams(self, episode_id: int) -> list[dict[str, Any]]:
+        """Get stream URLs for a specific episode from Dispatcharr."""
+        try:
+            data = self._get_json(f"/api/vod/episodes/{episode_id}/streams/")
+            if isinstance(data, list):
+                streams = data
+            elif isinstance(data, dict):
+                streams = data.get("results", [])
+            else:
+                streams = []
+            return redact_record(streams)
+        except Exception as exc:
+            logger.warning("Could not fetch streams for episode %s: %s", episode_id, exc)
+            return []
+
+    def get_movie_streams(self, movie_id: int) -> list[dict[str, Any]]:
+        """Get stream URLs for a specific movie from Dispatcharr."""
+        try:
+            data = self._get_json(f"/api/vod/movies/{movie_id}/streams/")
+            if isinstance(data, list):
+                streams = data
+            elif isinstance(data, dict):
+                streams = data.get("results", [])
+            else:
+                streams = []
+            return redact_record(streams)
+        except Exception as exc:
+            logger.warning("Could not fetch streams for movie %s: %s", movie_id, exc)
+            return []
