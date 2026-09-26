@@ -559,7 +559,7 @@ def playback_episode(
 
 
 @app.get("/v1/media/verify", tags=["media"])
-def verify_media_token(token: str, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
+def verify_media_token(token: str, services: ServicesDependency) -> dict[str, Any]:
     """Verify a playback token for media-layer authorization (M7)."""
     with database(services) as connection:
         session_info = verify_playback_token(token, connection, services.settings.playback_token_secret)
@@ -572,7 +572,7 @@ def verify_media_token(token: str, services: ServicesDependency, principal: dict
 
 
 @app.get("/v1/dispatcharr/health", tags=["operations"])
-def dispatcharr_health(services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
+def dispatcharr_health(services: ServicesDependency) -> dict[str, Any]:
     """Check Dispatcharr version probe (M4)."""
     try:
         data = services.dispatcharr.get_version()
@@ -592,6 +592,6 @@ def dispatcharr_health(services: ServicesDependency, principal: dict = Depends(c
 
 
 @app.get("/v1/ome/health", tags=["operations"])
-def ome_health(services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
+def ome_health(services: ServicesDependency) -> dict[str, Any]:
     """Check OvenMediaEngine health probe (M6)."""
     return services.ome.get_health()

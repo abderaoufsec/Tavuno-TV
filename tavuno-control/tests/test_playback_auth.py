@@ -83,7 +83,7 @@ class PlaybackAuthTests(unittest.TestCase):
             )
         
         # Should raise 403 with device not registered message
-        self.assertIn("not registered", str(ctx.exception).lower())
+        self.assertIn("device_not_registered", str(ctx.exception).lower())
 
     def test_verify_playback_token_rejects_tampered_signature(self):
         """Test that verify_playback_token rejects tampered signatures (Fix 9)."""
