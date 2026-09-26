@@ -155,7 +155,7 @@ def authorize_live_playback(
             detail="Account is not active"
         )
 
-    # 2. Device check
+    # 2. Device check (device_id comes from JWT, should always be registered)
     device = connection.execute(
         "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
@@ -163,8 +163,9 @@ def authorize_live_playback(
     if not device or not device["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Device is not registered or active for this profile",
+            detail="device_not_registered",
         )
+    device_id = device["id"]
 
     # 3. Subscription & entitlement check
     sub = connection.execute(
@@ -187,18 +188,6 @@ def authorize_live_playback(
 
     max_concurrent = sub["max_concurrent_streams"]
     max_devices = sub["max_devices"]
-
-    # 2. Device check (device_id comes from JWT, should always be registered)
-    device = connection.execute(
-        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
-        (device_key, profile_id),
-    ).fetchone()
-    if not device or not device["is_active"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="device_not_registered",
-        )
-    device_id = device["id"]
 
     # 4. Enforce concurrent stream limit
     active_sessions = connection.execute(
@@ -384,7 +373,7 @@ def authorize_movie_playback(
             detail="Account is not active"
         )
 
-    # 2. Device check
+    # 2. Device check (device_id comes from JWT, should always be registered)
     device = connection.execute(
         "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
@@ -392,8 +381,9 @@ def authorize_movie_playback(
     if not device or not device["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Device is not registered or active for this profile",
+            detail="device_not_registered",
         )
+    device_id = device["id"]
 
     # 3. Subscription & entitlement check
     sub = connection.execute(
@@ -416,18 +406,6 @@ def authorize_movie_playback(
 
     max_concurrent = sub["max_concurrent_streams"]
     max_devices = sub["max_devices"]
-
-    # 2. Device check (device_id comes from JWT, should always be registered)
-    device = connection.execute(
-        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
-        (device_key, profile_id),
-    ).fetchone()
-    if not device or not device["is_active"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="device_not_registered",
-        )
-    device_id = device["id"]
 
     # 4. Enforce concurrent stream limit
     active_sessions = connection.execute(
@@ -532,7 +510,7 @@ def authorize_episode_playback(
             detail="Account is not active"
         )
 
-    # 2. Device check
+    # 2. Device check (device_id comes from JWT, should always be registered)
     device = connection.execute(
         "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
@@ -540,8 +518,9 @@ def authorize_episode_playback(
     if not device or not device["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Device is not registered or active for this profile",
+            detail="device_not_registered",
         )
+    device_id = device["id"]
 
     # 3. Subscription & entitlement check
     sub = connection.execute(
@@ -564,18 +543,6 @@ def authorize_episode_playback(
 
     max_concurrent = sub["max_concurrent_streams"]
     max_devices = sub["max_devices"]
-
-    # 2. Device check (device_id comes from JWT, should always be registered)
-    device = connection.execute(
-        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
-        (device_key, profile_id),
-    ).fetchone()
-    if not device or not device["is_active"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="device_not_registered",
-        )
-    device_id = device["id"]
 
     # 4. Enforce concurrent stream limit
     active_sessions = connection.execute(
