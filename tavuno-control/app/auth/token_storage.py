@@ -75,3 +75,13 @@ class TokenStorageService:
         """Delete an email verification token."""
         key = f"email_verification:{token}"
         return bool(self.redis.delete(key))
+
+    def denylist_refresh_jti(self, jti: str, ttl_seconds: int) -> None:
+        """Add a refresh token JTI to the denylist."""
+        key = f"auth:refresh_denylist:{jti}"
+        self.redis.setex(key, ttl_seconds, "1")
+
+    def is_refresh_jti_denylisted(self, jti: str) -> bool:
+        """Check if a refresh token JTI is denylisted."""
+        key = f"auth:refresh_denylist:{jti}"
+        return bool(self.redis.exists(key))

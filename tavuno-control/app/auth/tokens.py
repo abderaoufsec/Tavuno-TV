@@ -1,6 +1,7 @@
 """JWT token management for authentication."""
 
 import jwt
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from app.config import get_settings
@@ -27,7 +28,8 @@ def create_refresh_token(data: Dict[str, Any], expires_in_seconds: int = 2592000
         **data,
         'exp': expire,
         'iat': datetime.now(timezone.utc),
-        'type': 'refresh'
+        'type': 'refresh',
+        'jti': str(uuid.uuid4())  # JWT ID for revocation tracking
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm='HS256')
 

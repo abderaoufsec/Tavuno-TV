@@ -65,6 +65,19 @@
 - Device registration working
 - Device limits enforced
 
+**Post-M9 Remediation (2026-09-26):**
+The following authentication/authorization defects identified before M9 were remediated in branch `fix/pre-m13-auth-hardening`:
+- S1-03: Logout and password-reset device bricking (separated is_active from revoked_at)
+- S2-01: Refresh token rotation and revocation (added JTI, Redis denylist, replay detection)
+- S1-05: Catalog authentication requirements (added auth dependencies to all catalog routes)
+- S1-06: Playback auto-registration removed (403 for unregistered devices)
+- S1-04: Duplicate device registration endpoint removed
+- S2-06: Spoofable X-Device-Fingerprint header removed (uses device_id from JWT)
+- S2-03: Hardcoded 2-device default removed (requires active subscription)
+- S2-02: Subscription validity consistency fixed (NULL check for ends_at)
+- S2-04: Dead signature check removed (hmac.compare_digest for constant-time comparison)
+- Android LoginRequest.deviceFingerprint serialization fixed (@SerializedName annotation)
+
 ### M10 — Tavuno Live TV ✅ COMPLETE
 - Live TV screen implemented
 - Category filtering working

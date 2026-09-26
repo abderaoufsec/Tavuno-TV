@@ -15,7 +15,6 @@ router = APIRouter(prefix="/v1/devices", tags=["devices"])
 @router.get("", response_model=List[DeviceDto])
 def list_devices(
     request: Request,
-    device_fingerprint: str = Header(..., alias="X-Device-Fingerprint"),
 ):
     """List all devices for the current user."""
     services: Services = request.app.state.services
@@ -33,7 +32,8 @@ def list_devices(
     
     try:
         profile = auth_service.get_profile_from_token(token)
-        return device_service.list_devices(profile['profile_id'], device_fingerprint)
+        current_device_id = profile.get('device_id')
+        return device_service.list_devices(profile['profile_id'], current_device_id)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

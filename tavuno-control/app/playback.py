@@ -76,11 +76,6 @@ def verify_playback_token(token: str, connection: Any, secret: str) -> dict[str,
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     
     # Verify signature
-    payload = f"{session_id}:unknown:live:unknown:{expires_at}"
-    expected_signature = hmac.new(
-        secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
-    ).hexdigest()[:32]
-    
     # For security, we need the full payload including device_id and content_key
     # So we look up the session and verify
     session = connection.execute(
@@ -101,7 +96,7 @@ def verify_playback_token(token: str, connection: Any, secret: str) -> dict[str,
         secret.encode("utf-8"), actual_payload.encode("utf-8"), hashlib.sha256
     ).hexdigest()[:32]
     
-    if signature != actual_signature:
+    if not hmac.compare_digest(signature, actual_signature):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token signature")
     
     return {
@@ -193,41 +188,17 @@ def authorize_live_playback(
     max_concurrent = sub["max_concurrent_streams"]
     max_devices = sub["max_devices"]
 
-    # Check device limit
-    device_count = connection.execute(
-        """
-        SELECT COUNT(*) AS count FROM tavuno_devices
-        WHERE profile = %s AND is_active = TRUE
-        """,
-        (profile_id,),
-    ).fetchone()
-    
-    # Check if this specific device is already registered
-    current_device = connection.execute(
-        "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+    # 2. Device check (device_id comes from JWT, should always be registered)
+    device = connection.execute(
+        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
     ).fetchone()
-    
-    # If device not registered and at device limit, block
-    if not current_device and device_count and device_count["count"] >= max_devices:
+    if not device or not device["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Device limit reached ({max_devices} devices). Register this device first.",
+            detail="device_not_registered",
         )
-    
-    # Auto-register device if not registered but under limit
-    if not current_device:
-        device_row = connection.execute(
-            """
-            INSERT INTO tavuno_devices (profile, name, device_key, platform, is_active, last_seen_at)
-            VALUES (%s, 'Auto-registered Device', %s, 'unknown', TRUE, NOW())
-            RETURNING id
-            """,
-            (profile_id, device_key),
-        ).fetchone()
-        device_id = device_row["id"]
-    else:
-        device_id = current_device["id"]
+    device_id = device["id"]
 
     # 4. Enforce concurrent stream limit
     active_sessions = connection.execute(
@@ -446,41 +417,17 @@ def authorize_movie_playback(
     max_concurrent = sub["max_concurrent_streams"]
     max_devices = sub["max_devices"]
 
-    # Check device limit
-    device_count = connection.execute(
-        """
-        SELECT COUNT(*) AS count FROM tavuno_devices
-        WHERE profile = %s AND is_active = TRUE
-        """,
-        (profile_id,),
-    ).fetchone()
-    
-    # Check if this specific device is already registered
-    current_device = connection.execute(
-        "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+    # 2. Device check (device_id comes from JWT, should always be registered)
+    device = connection.execute(
+        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
     ).fetchone()
-    
-    # If device not registered and at device limit, block
-    if not current_device and device_count and device_count["count"] >= max_devices:
+    if not device or not device["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Device limit reached ({max_devices} devices). Register this device first.",
+            detail="device_not_registered",
         )
-    
-    # Auto-register device if not registered but under limit
-    if not current_device:
-        device_row = connection.execute(
-            """
-            INSERT INTO tavuno_devices (profile, name, device_key, platform, is_active, last_seen_at)
-            VALUES (%s, 'Auto-registered Device', %s, 'unknown', TRUE, NOW())
-            RETURNING id
-            """,
-            (profile_id, device_key),
-        ).fetchone()
-        device_id = device_row["id"]
-    else:
-        device_id = current_device["id"]
+    device_id = device["id"]
 
     # 4. Enforce concurrent stream limit
     active_sessions = connection.execute(
@@ -618,41 +565,17 @@ def authorize_episode_playback(
     max_concurrent = sub["max_concurrent_streams"]
     max_devices = sub["max_devices"]
 
-    # Check device limit
-    device_count = connection.execute(
-        """
-        SELECT COUNT(*) AS count FROM tavuno_devices
-        WHERE profile = %s AND is_active = TRUE
-        """,
-        (profile_id,),
-    ).fetchone()
-    
-    # Check if this specific device is already registered
-    current_device = connection.execute(
-        "SELECT id FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+    # 2. Device check (device_id comes from JWT, should always be registered)
+    device = connection.execute(
+        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
     ).fetchone()
-    
-    # If device not registered and at device limit, block
-    if not current_device and device_count and device_count["count"] >= max_devices:
+    if not device or not device["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Device limit reached ({max_devices} devices). Register this device first.",
+            detail="device_not_registered",
         )
-    
-    # Auto-register device if not registered but under limit
-    if not current_device:
-        device_row = connection.execute(
-            """
-            INSERT INTO tavuno_devices (profile, name, device_key, platform, is_active, last_seen_at)
-            VALUES (%s, 'Auto-registered Device', %s, 'unknown', TRUE, NOW())
-            RETURNING id
-            """,
-            (profile_id, device_key),
-        ).fetchone()
-        device_id = device_row["id"]
-    else:
-        device_id = current_device["id"]
+    device_id = device["id"]
 
     # 4. Enforce concurrent stream limit
     active_sessions = connection.execute(

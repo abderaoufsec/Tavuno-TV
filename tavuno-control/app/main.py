@@ -14,6 +14,7 @@ from .services import Services
 from .auth.router import router as auth_router
 from .devices.router import router as devices_router
 from .auth.service import AuthService
+from .auth.deps import current_principal, require_admin
 from .catalog.service import CatalogService
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
@@ -106,20 +107,20 @@ def health(services: ServicesDependency) -> dict[str, Any]:
 
 
 @app.get("/v1/home", tags=["catalog"])
-def home(services: ServicesDependency) -> dict[str, Any]:
+def home(services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     catalog = CatalogService(services)
     return catalog.get_home()
 
 
 @app.get("/v1/channels", tags=["catalog"])
-def list_channels(services: ServicesDependency, category_id: int | None = None) -> list[dict[str, Any]]:
+def list_channels(services: ServicesDependency, category_id: int | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     catalog = CatalogService(services)
     channels = catalog.get_channels(category_id=category_id)
     return [channel.model_dump() for channel in channels]
 
 
 @app.get("/v1/channels/{channel_id}", tags=["catalog"])
-def get_channel(channel_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_channel(channel_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     catalog = CatalogService(services)
     channel = catalog.get_channel(channel_id)
     if channel is None:
@@ -143,7 +144,7 @@ def get_channel(channel_id: int, services: ServicesDependency) -> dict[str, Any]
 
 
 @app.get("/v1/channels/{channel_id}/details", tags=["catalog"])
-def get_channel_details(channel_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_channel_details(channel_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Get detailed channel information for content detail screens (M12)."""
     catalog = CatalogService(services)
     channel_details = catalog.get_channel_details(channel_id)
@@ -152,35 +153,8 @@ def get_channel_details(channel_id: int, services: ServicesDependency) -> dict[s
     return channel_details.model_dump()
 
 
-class DeviceRegistration(BaseModel):
-    profile_id: int
-    name: str = Field(min_length=1, max_length=120)
-    device_key: str = Field(min_length=8, max_length=255)
-    platform: str = Field(min_length=2, max_length=48)
-
-
-@app.post("/v1/devices/register", status_code=status.HTTP_201_CREATED, tags=["devices"])
-def register_device(payload: DeviceRegistration, services: ServicesDependency) -> dict[str, Any]:
-    with database(services) as connection:
-        profile = connection.execute("SELECT id FROM tavuno_profiles WHERE id = %s AND status = 'active'", (payload.profile_id,)).fetchone()
-        if profile is None:
-            raise HTTPException(status_code=404, detail="Active profile not found")
-        device = connection.execute(
-            """
-            INSERT INTO tavuno_devices (profile, name, device_key, platform, is_active, last_seen_at)
-            VALUES (%s, %s, %s, %s, TRUE, NOW())
-            ON CONFLICT (device_key) DO UPDATE SET name = EXCLUDED.name, platform = EXCLUDED.platform,
-              last_seen_at = NOW(), is_active = TRUE
-            RETURNING id, profile, name, device_key, platform, is_active, last_seen_at
-            """,
-            (payload.profile_id, payload.name, payload.device_key, payload.platform),
-        ).fetchone()
-        connection.commit()
-    return device
-
-
 @app.get("/v1/epg", tags=["epg"])
-def epg(services: ServicesDependency, channel_id: int | None = None) -> list[dict[str, Any]]:
+def epg(services: ServicesDependency, channel_id: int | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     # Try cache first for M5 EPG caching requirement
     if channel_id is not None:
         cached = services.get_cached_epg(channel_id)
@@ -198,23 +172,23 @@ def epg(services: ServicesDependency, channel_id: int | None = None) -> list[dic
     query += " ORDER BY p.starts_at"
     with database(services) as connection:
         programmes = connection.execute(query, parameters).fetchall()
-    
+
     # Cache the result for channel-specific queries
     if channel_id is not None:
         services.cache_epg(channel_id, programmes)
-    
+
     return programmes
 
 
 @app.get("/v1/categories", tags=["catalog"])
-def list_categories(services: ServicesDependency, kind: str | None = None) -> list[dict[str, Any]]:
+def list_categories(services: ServicesDependency, kind: str | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     catalog = CatalogService(services)
     categories = catalog.get_categories(kind=kind)
     return [category.model_dump() for category in categories]
 
 
 @app.get("/v1/categories/{category_id}", tags=["catalog"])
-def get_category(category_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_category(category_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     catalog = CatalogService(services)
     category = catalog.get_category(category_id)
     if category is None:
@@ -223,14 +197,14 @@ def get_category(category_id: int, services: ServicesDependency) -> dict[str, An
 
 
 @app.get("/v1/movies", tags=["catalog"])
-def movies(services: ServicesDependency, category_id: int | None = None) -> list[dict[str, Any]]:
+def movies(services: ServicesDependency, category_id: int | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     catalog = CatalogService(services)
     movies = catalog.get_movies(category_id=category_id)
     return [movie.model_dump() for movie in movies]
 
 
 @app.get("/v1/movies/{movie_id}", tags=["catalog"])
-def get_movie(movie_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_movie(movie_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     catalog = CatalogService(services)
     movie = catalog.get_movie(movie_id)
     if movie is None:
@@ -239,7 +213,7 @@ def get_movie(movie_id: int, services: ServicesDependency) -> dict[str, Any]:
 
 
 @app.get("/v1/movies/{movie_id}/details", tags=["catalog"])
-def get_movie_details(movie_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_movie_details(movie_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Get detailed movie information for content detail screens (M12)."""
     catalog = CatalogService(services)
     movie_details = catalog.get_movie_details(movie_id)
@@ -249,14 +223,14 @@ def get_movie_details(movie_id: int, services: ServicesDependency) -> dict[str, 
 
 
 @app.get("/v1/series", tags=["catalog"])
-def series(services: ServicesDependency, category_id: int | None = None) -> list[dict[str, Any]]:
+def series(services: ServicesDependency, category_id: int | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     catalog = CatalogService(services)
     series_list = catalog.get_series(category_id=category_id)
     return [series_item.model_dump() for series_item in series_list]
 
 
 @app.get("/v1/series/{series_id}", tags=["catalog"])
-def get_series(series_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_series(series_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     catalog = CatalogService(services)
     series_item = catalog.get_series_by_id(series_id)
     if series_item is None:
@@ -265,7 +239,7 @@ def get_series(series_id: int, services: ServicesDependency) -> dict[str, Any]:
 
 
 @app.get("/v1/series/{series_id}/details", tags=["catalog"])
-def get_series_details(series_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_series_details(series_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Get detailed series information for content detail screens (M12)."""
     catalog = CatalogService(services)
     series_details = catalog.get_series_details(series_id)
@@ -275,7 +249,7 @@ def get_series_details(series_id: int, services: ServicesDependency) -> dict[str
 
 
 @app.get("/v1/series/{series_id}/seasons", tags=["catalog"])
-def get_series_seasons(series_id: int, services: ServicesDependency) -> list[dict[str, Any]]:
+def get_series_seasons(series_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     """Get seasons for a specific series (M12)."""
     catalog = CatalogService(services)
     series_details = catalog.get_series_details(series_id)
@@ -285,7 +259,7 @@ def get_series_seasons(series_id: int, services: ServicesDependency) -> list[dic
 
 
 @app.get("/v1/seasons/{season_id}/episodes", tags=["catalog"])
-def get_season_episodes(season_id: int, services: ServicesDependency) -> list[dict[str, Any]]:
+def get_season_episodes(season_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     """Get episodes for a specific season (M12)."""
     catalog = CatalogService(services)
     episodes = catalog.get_season_episodes(season_id)
@@ -293,7 +267,7 @@ def get_season_episodes(season_id: int, services: ServicesDependency) -> list[di
 
 
 @app.get("/v1/sports/competitions", tags=["catalog"])
-def list_competitions(services: ServicesDependency, sport: str | None = None) -> list[dict[str, Any]]:
+def list_competitions(services: ServicesDependency, sport: str | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     """Get all active competitions, optionally filtered by sport (M11)."""
     catalog = CatalogService(services)
     competitions = catalog.get_competitions(sport=sport)
@@ -301,7 +275,7 @@ def list_competitions(services: ServicesDependency, sport: str | None = None) ->
 
 
 @app.get("/v1/sports/competitions/{competition_id}", tags=["catalog"])
-def get_competition(competition_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_competition(competition_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Get a specific competition by ID (M11)."""
     catalog = CatalogService(services)
     competition = catalog.get_competition(competition_id)
@@ -315,7 +289,8 @@ def list_competition_matches(
     competition_id: int,
     services: ServicesDependency,
     status: str | None = None,
-    limit: int = 100
+    limit: int = 100,
+    principal: dict = Depends(current_principal)
 ) -> list[dict[str, Any]]:
     """Get matches for a specific competition, optionally filtered by status (M11)."""
     catalog = CatalogService(services)
@@ -327,7 +302,8 @@ def list_competition_matches(
 def list_matches(
     services: ServicesDependency,
     status: str | None = None,
-    limit: int = 100
+    limit: int = 100,
+    principal: dict = Depends(current_principal)
 ) -> list[dict[str, Any]]:
     """Get all matches, optionally filtered by status (M11)."""
     catalog = CatalogService(services)
@@ -336,7 +312,7 @@ def list_matches(
 
 
 @app.get("/v1/sports/matches/{match_id}", tags=["catalog"])
-def get_match(match_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_match(match_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Get a specific match by ID (M11)."""
     catalog = CatalogService(services)
     match = catalog.get_match(match_id)
@@ -346,7 +322,7 @@ def get_match(match_id: int, services: ServicesDependency) -> dict[str, Any]:
 
 
 @app.get("/v1/sports/matches/{match_id}/details", tags=["catalog"])
-def get_match_details(match_id: int, services: ServicesDependency) -> dict[str, Any]:
+def get_match_details(match_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Get detailed match information with team names and channel (M11)."""
     catalog = CatalogService(services)
     match_details = catalog.get_match_details(match_id)
@@ -356,7 +332,7 @@ def get_match_details(match_id: int, services: ServicesDependency) -> dict[str, 
 
 
 @app.get("/v1/epg/channel/{channel_id}/now-next", tags=["epg"])
-def channel_epg_now_next(channel_id: int, services: ServicesDependency) -> dict[str, Any]:
+def channel_epg_now_next(channel_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Return NOW, NEXT, and LATER programmes for a specific channel (M5)."""
     with database(services) as connection:
         programmes = connection.execute(
@@ -458,37 +434,8 @@ def playback_stop(
 
 
 @app.post("/v1/admin/sync/dispatcharr", tags=["admin"])
-def sync_from_dispatcharr(services: ServicesDependency, authorization: str | None = Header(None)) -> dict[str, Any]:
+def sync_from_dispatcharr(services: ServicesDependency, principal: dict = Depends(require_admin)) -> dict[str, Any]:
     """Synchronize channels, VOD, stream mappings, and EPG from Dispatcharr (M4)."""
-    if not authorization:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
-    
-    # Extract Bearer token
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
-    token = authorization.replace("Bearer ", "")
-    
-    try:
-        # Use AuthService to verify token and get profile
-        auth_service = AuthService(services)
-        auth_data = auth_service.get_profile_from_token(token)
-        profile_id = auth_data["profile_id"]
-        
-        # Check if profile has admin role
-        if auth_data.get("role") != "admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin access required"
-            )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Admin authorization check failed")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        ) from exc
-    
     try:
         with database(services) as connection:
             result = services.sync.sync_all(connection)
@@ -504,7 +451,7 @@ def sync_from_dispatcharr(services: ServicesDependency, authorization: str | Non
 
 
 @app.get("/v1/admin/sync/dispatcharr", tags=["admin"])
-def last_dispatcharr_sync(services: ServicesDependency) -> dict[str, Any]:
+def last_dispatcharr_sync(services: ServicesDependency, principal: dict = Depends(require_admin)) -> dict[str, Any]:
     summary = services.sync.last_sync()
     if summary is None:
         return {"status": "never", "detail": "No Dispatcharr sync has been recorded yet"}
@@ -612,7 +559,7 @@ def playback_episode(
 
 
 @app.get("/v1/media/verify", tags=["media"])
-def verify_media_token(token: str, services: ServicesDependency) -> dict[str, Any]:
+def verify_media_token(token: str, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Verify a playback token for media-layer authorization (M7)."""
     with database(services) as connection:
         session_info = verify_playback_token(token, connection, services.settings.playback_token_secret)
@@ -625,7 +572,7 @@ def verify_media_token(token: str, services: ServicesDependency) -> dict[str, An
 
 
 @app.get("/v1/dispatcharr/health", tags=["operations"])
-def dispatcharr_health(services: ServicesDependency) -> dict[str, Any]:
+def dispatcharr_health(services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Check Dispatcharr version probe (M4)."""
     try:
         data = services.dispatcharr.get_version()
@@ -645,6 +592,6 @@ def dispatcharr_health(services: ServicesDependency) -> dict[str, Any]:
 
 
 @app.get("/v1/ome/health", tags=["operations"])
-def ome_health(services: ServicesDependency) -> dict[str, Any]:
+def ome_health(services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Check OvenMediaEngine health probe (M6)."""
     return services.ome.get_health()
