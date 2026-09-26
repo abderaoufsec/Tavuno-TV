@@ -292,9 +292,10 @@ class AuthService:
                 (new_password_hash, profile_id)
             )
 
-            # Invalidate all devices for this profile (security best practice)
+            # Deactivate all devices for this profile (security best practice)
+            # Use is_active = FALSE instead of revoked_at
             conn.execute(
-                "UPDATE tavuno_devices SET revoked_at = NOW() WHERE profile = %s",
+                "UPDATE tavuno_devices SET is_active = FALSE WHERE profile = %s",
                 (profile_id,)
             )
 
@@ -302,6 +303,11 @@ class AuthService:
 
         # Delete token (single-use)
         self.token_storage.delete_password_reset_token(token)
+
+        # TODO(Fix 2): denylist all refresh tokens for profile
+        # This would require tracking all refresh JTIs for a profile, which is not
+        # currently implemented. For now, devices are deactivated and access tokens
+        # will expire within jwt_access_ttl_seconds (default 15 minutes).
 
     def login(self, email: str, password: str, device_fingerprint: str, platform: str, ip: str) -> Dict[str, Any]:
         """Authenticate user and issue tokens."""
@@ -345,11 +351,18 @@ class AuthService:
             if device:
                 if device['revoked_at']:
                     raise ValueError("Device has been revoked")
-                # Update last_seen_at
-                conn.execute(
-                    "UPDATE tavuno_devices SET last_seen_at = NOW() WHERE id = %s",
-                    (device['id'],)
-                )
+                # If device is inactive (e.g., after logout), reactivate it
+                if not device['is_active']:
+                    conn.execute(
+                        "UPDATE tavuno_devices SET is_active = TRUE, last_seen_at = NOW() WHERE id = %s",
+                        (device['id'],)
+                    )
+                else:
+                    # Update last_seen_at for active devices
+                    conn.execute(
+                        "UPDATE tavuno_devices SET last_seen_at = NOW() WHERE id = %s",
+                        (device['id'],)
+                    )
                 device_id = device['id']
             else:
                 # New device - check device limit
@@ -429,6 +442,18 @@ class AuthService:
         except ValueError as e:
             raise ValueError('Invalid refresh token')
 
+        # Check if refresh token is denylisted (token reuse detection)
+        jti = payload.get('jti')
+        if jti and self.token_storage.is_refresh_jti_denylisted(jti):
+            # Token reuse detected - deactivate all devices for this profile
+            with self._db() as conn:
+                conn.execute(
+                    "UPDATE tavuno_devices SET is_active = FALSE WHERE profile = %s",
+                    (payload['profile_id'],)
+                )
+                conn.commit()
+            raise ValueError('refresh_token_reused')
+
         profile_id = payload['profile_id']
         device_id = payload['device_id']
 
@@ -438,12 +463,15 @@ class AuthService:
                 "SELECT id, profile, is_active, revoked_at FROM tavuno_devices WHERE id = %s AND profile = %s",
                 (device_id, profile_id),
             ).fetchone()
-            
+
             if not device or not device['is_active'] or device['revoked_at']:
                 raise ValueError('Device not found or revoked')
 
-            # Invalidate old refresh token (in production, use token blacklist)
-            # For now, we'll just issue new tokens
+            # Denylist old refresh token with TTL = remaining lifetime
+            if jti:
+                remaining_ttl = int(payload['exp'] - time.time())
+                if remaining_ttl > 0:
+                    self.token_storage.denylist_refresh_jti(jti, remaining_ttl)
 
             # Create new tokens
             new_access = create_access_token(
@@ -485,13 +513,21 @@ class AuthService:
 
             profile_id = payload['profile_id']
             device_id = payload['device_id']
+            jti = payload.get('jti')
 
             with self._db() as conn:
+                # Set is_active = FALSE instead of revoked_at
                 conn.execute(
-                    "UPDATE tavuno_devices SET revoked_at = NOW() WHERE id = %s AND profile = %s",
+                    "UPDATE tavuno_devices SET is_active = FALSE WHERE id = %s AND profile = %s",
                     (device_id, profile_id),
                 )
                 conn.commit()
+
+            # Denylist the refresh token
+            if jti:
+                remaining_ttl = int(payload['exp'] - time.time())
+                if remaining_ttl > 0:
+                    self.token_storage.denylist_refresh_jti(jti, remaining_ttl)
         except ValueError:
             pass  # Ignore invalid tokens
 
