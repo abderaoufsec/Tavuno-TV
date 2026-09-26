@@ -66,7 +66,7 @@ def login(
             ip=client_ip,
         )
     except ValueError as e:
-        # Return 403 for device limit errors, 401 for credentials errors
+        # Return 403 for device limit errors, 401 for credentials errors, 402 for subscription required
         error_msg = str(e).lower()
         if "device_limit_reached" in error_msg or "device_revoked" in error_msg:
             raise HTTPException(
@@ -80,6 +80,11 @@ def login(
                     "error": "ACCOUNT_INACTIVE",
                     "message": "Your account is not activated yet. Please activate your subscription from your Tavuno account."
                 }
+            )
+        if "subscription_required" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="subscription_required"
             )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

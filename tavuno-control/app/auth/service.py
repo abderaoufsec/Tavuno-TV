@@ -372,17 +372,18 @@ class AuthService:
                     SELECT s.id, s.status, s.ends_at, p.max_devices
                     FROM tavuno_subscriptions s
                     JOIN tavuno_plans p ON s.plan = p.id
-                    WHERE s.profile = %s AND s.status = 'active' AND s.ends_at > NOW()
+                    WHERE s.profile = %s AND s.status = 'active'
+                      AND (s.ends_at IS NULL OR s.ends_at > NOW())
                     ORDER BY s.ends_at DESC
                     LIMIT 1
                     """,
                     (profile['id'],),
                 ).fetchone()
                 
-                # Default to 2 devices if no active subscription for testing
-                max_devices = 2
-                if subscription:
-                    max_devices = subscription['max_devices'] or 2
+                if not subscription:
+                    raise ValueError("subscription_required")
+                
+                max_devices = subscription['max_devices'] or 2
                 
                 # Count active (non-revoked) devices for this profile
                 active_count = conn.execute(
