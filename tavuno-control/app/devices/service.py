@@ -17,7 +17,7 @@ class DeviceService:
         with self.services.connection() as connection:
             yield connection
 
-    def list_devices(self, profile_id: int, device_fingerprint: str) -> List[DeviceDto]:
+    def list_devices(self, profile_id: int, current_device_id: int) -> List[DeviceDto]:
         """List all devices for a profile."""
         with self._db() as conn:
             devices = conn.execute(
@@ -36,7 +36,7 @@ class DeviceService:
                     display_name=d['display_name'],
                     platform=d['platform'],
                     last_seen_at=d['last_seen_at'],
-                    is_current=(d['device_fingerprint'] == device_fingerprint),
+                    is_current=(d['id'] == current_device_id),
                     is_revoked=(d['revoked_at'] is not None)
                 )
                 for d in devices

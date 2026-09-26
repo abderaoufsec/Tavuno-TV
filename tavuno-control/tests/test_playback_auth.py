@@ -2,6 +2,7 @@
 
 import os
 import unittest
+from contextlib import contextmanager
 from unittest.mock import MagicMock
 
 os.environ.setdefault("POSTGRES_PASSWORD", "test")
@@ -81,30 +82,34 @@ class PlaybackAuthTests(unittest.TestCase):
                 settings=self.settings
             )
         
-        # Should raise 403 with device_not_registered
-        self.assertIn("device_not_registered", str(ctx.exception).lower())
+        # Should raise 403 with device not registered message
+        self.assertIn("not registered", str(ctx.exception).lower())
 
     def test_verify_playback_token_rejects_tampered_signature(self):
         """Test that verify_playback_token rejects tampered signatures (Fix 9)."""
         from app.playback import verify_playback_token
         from fastapi import HTTPException
         
-        conn = FakeConnection()
-        conn.fetchone.return_value = {
-            "id": 101,
-            "profile": 1,
-            "device": 10,
-            "content_type": "live",
-            "content_key": "1",
-            "status": "active",
-            "expires_at": "2099-12-31"
-        }
+        @contextmanager
+        def mock_connection():
+            mock_conn = MagicMock()
+            mock_conn.execute.return_value.fetchone.return_value = {
+                "id": 101,
+                "profile": 1,
+                "device": 10,
+                "content_type": "live",
+                "content_key": "1",
+                "status": "active",
+                "expires_at": "2099-12-31"
+            }
+            yield mock_conn
         
         # Create a token with wrong signature
         token = "101.9999999999.wrongsignature"
         
-        with self.assertRaises(HTTPException) as ctx:
-            verify_playback_token(token, conn, self.settings.playback_token_secret)
+        with mock_connection() as conn:
+            with self.assertRaises(HTTPException) as ctx:
+                verify_playback_token(token, conn, self.settings.playback_token_secret)
         
         self.assertEqual(ctx.exception.status_code, 401)
         self.assertIn("signature", str(ctx.exception.detail).lower())

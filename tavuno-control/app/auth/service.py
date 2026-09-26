@@ -184,7 +184,7 @@ class AuthService:
     def get_subscription(self, profile_id: int) -> Dict[str, Any]:
         """Get subscription and entitlements for a profile."""
         with self._db() as conn:
-            # Get subscription with plan
+            # Get subscription with plan - use consistent NULL check for ends_at
             subscription = conn.execute(
                 """
                 SELECT s.id, s.status, s.starts_at, s.ends_at,
