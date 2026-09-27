@@ -11,6 +11,7 @@ class RealisticDispatcharrClient:
     
     def __init__(self):
         self._call_count = 0
+        self._movie_overrides: dict[int, dict] = {}
     
     def get_version(self):
         return {"version": "0.28.0"}
@@ -41,8 +42,8 @@ class RealisticDispatcharrClient:
         return []
     
     def get_all_movies(self):
-        """Multiple movies including edge cases."""
-        return [
+        """Multiple movies including edge cases, with optional overrides."""
+        base_movies = [
             # Normal movie with full metadata
             {
                 "id": 100,
@@ -76,6 +77,16 @@ class RealisticDispatcharrClient:
                 "description": "Test movie with stream URL"
             }
         ]
+        
+        # Apply overrides
+        result = []
+        for movie in base_movies:
+            movie_copy = dict(movie)
+            if movie["id"] in self._movie_overrides:
+                movie_copy.update(self._movie_overrides[movie["id"]])
+            result.append(movie_copy)
+        
+        return result
     
     def get_all_series(self):
         """Series with multiple seasons, including edge case of empty season."""
@@ -277,12 +288,16 @@ class RealisticRecordingConnection:
                 new_id = self._next_ids["episode"]
                 season_id = self.parameters[0]
                 episode_number = self.parameters[1]
+                synopsis = self.parameters[3]
+                # Convert empty string to None for missing descriptions
+                if synopsis == "":
+                    synopsis = None
                 self._episodes[(season_id, episode_number)] = {
                     "id": new_id,
                     "season": season_id,
                     "episode_number": episode_number,
                     "title": self.parameters[2],
-                    "synopsis": self.parameters[3],
+                    "synopsis": synopsis,
                     "stream_url": self.parameters[4],
                     "is_active": True
                 }
@@ -463,6 +478,111 @@ class RealisticVODSyncTests(unittest.TestCase):
         self.assertEqual(breaking_bad["title"], "Breaking Bad")
         self.assertEqual(breaking_bad["synopsis"], "A chemistry teacher turned methamphetamine manufacturer.")
     
+    def test_vod_sync_creates_episodes_with_correct_values(self):
+        """Test that sync creates episodes with correct values, including missing descriptions."""
+        connection = RealisticRecordingConnection()
+        redis = MagicMock()
+        
+        # Pre-populate categories
+        connection._categories = {"Action": 1, "Drama": 2, "Comedy": 3}
+        
+        client = RealisticDispatcharrClient()
+        service = SyncService(client, redis=redis, expected_version="0.28.0")
+        
+        # Sync series first (required dependency)
+        service.sync_series(connection)
+        
+        # Sync episodes
+        episodes_synced = service.sync_episodes(connection)
+        
+        # Assert 7 episodes were synchronized
+        self.assertEqual(episodes_synced, 7)
+        self.assertEqual(len(connection._episodes), 7)
+        
+        # Assert specific episode values
+        # Season 1 Episode 1
+        s1_id = connection._seasons[(1, 1)]
+        pilot = connection._episodes[(s1_id, 1)]
+        self.assertEqual(pilot["title"], "Pilot")
+        self.assertEqual(pilot["synopsis"], "The first episode")
+        
+        # Season 2 Episode 1
+        s2_id = connection._seasons[(1, 2)]
+        seven_thirty_seven = connection._episodes[(s2_id, 1)]
+        self.assertEqual(seven_thirty_seven["title"], "Seven Thirty-Seven")
+        self.assertEqual(seven_thirty_seven["synopsis"], "Walter is diagnosed with cancer.")
+        
+        # Episode with no description should have None synopsis
+        no_desc_ep = connection._episodes[(s1_id, 3)]
+        self.assertEqual(no_desc_ep["title"], "No Description Episode")
+        self.assertIsNone(no_desc_ep["synopsis"])
+    
+    def test_vod_sync_creates_multiple_seasons_correctly(self):
+        """Test that sync creates multiple seasons correctly and associates episodes with the right season."""
+        connection = RealisticRecordingConnection()
+        redis = MagicMock()
+        
+        # Pre-populate categories
+        connection._categories = {"Action": 1, "Drama": 2, "Comedy": 3}
+        
+        client = RealisticDispatcharrClient()
+        service = SyncService(client, redis=redis, expected_version="0.28.0")
+        
+        # Sync series first
+        service.sync_series(connection)
+        
+        # Sync episodes
+        service.sync_episodes(connection)
+        
+        # Assert 3 seasons were created (2 for Breaking Bad, 1 for No Description Series)
+        self.assertEqual(len(connection._seasons), 3)
+        
+        # Breaking Bad (series ID 1) should have 2 seasons
+        self.assertIn((1, 1), connection._seasons)  # Season 1
+        self.assertIn((1, 2), connection._seasons)  # Season 2
+        
+        # No Description Series (series ID 2) should have 1 season
+        self.assertIn((2, 1), connection._seasons)  # Season 1
+        
+        # Assert episodes are associated with correct seasons
+        s1_id = connection._seasons[(1, 1)]
+        s2_id = connection._seasons[(1, 2)]
+        
+        # Season 1 should have 3 episodes
+        s1_episodes = [ep for key, ep in connection._episodes.items() if key[0] == s1_id]
+        self.assertEqual(len(s1_episodes), 3)
+        
+        # Season 2 should have 2 episodes
+        s2_episodes = [ep for key, ep in connection._episodes.items() if key[0] == s2_id]
+        self.assertEqual(len(s2_episodes), 2)
+    
+    def test_vod_sync_episodes_idempotent_on_rerun(self):
+        """Test that re-running episode sync with identical data doesn't create duplicates."""
+        connection = RealisticRecordingConnection()
+        redis = MagicMock()
+        
+        # Pre-populate categories
+        connection._categories = {"Action": 1, "Drama": 2, "Comedy": 3}
+        
+        client = RealisticDispatcharrClient()
+        service = SyncService(client, redis=redis, expected_version="0.28.0")
+        
+        # Sync series first
+        service.sync_series(connection)
+        
+        # First episode sync
+        episodes_synced_1 = service.sync_episodes(connection)
+        first_episode_count = len(connection._episodes)
+        
+        # Second episode sync with identical data
+        episodes_synced_2 = service.sync_episodes(connection)
+        
+        # Assert no new episodes were created
+        self.assertEqual(len(connection._episodes), first_episode_count)
+        
+        # Assert sync count is 0 for second run (all upserts)
+        self.assertEqual(episodes_synced_2, 0)
+    
     def test_vod_sync_is_idempotent_on_rerun(self):
         """Test that re-running sync with identical data doesn't create duplicates (upsert behavior)."""
         connection = RealisticRecordingConnection()
@@ -507,16 +627,24 @@ class RealisticVODSyncTests(unittest.TestCase):
         # First sync
         service.sync_movies(connection)
         
-        first_movie_count = len(connection._movies)
+        # Record the current synopsis for movie 100
+        original_synopsis = connection._movies["darr-movie-100"]["synopsis"]
+        self.assertEqual(original_synopsis, "A computer hacker learns about the true nature of reality.")
         
-        # Verify we have the movie
-        self.assertIn("darr-movie-100", connection._movies)
+        # Set override to change the description
+        client._movie_overrides[100] = {
+            "description": "An updated synopsis after a metadata refresh."
+        }
         
-        # Second sync with identical data
+        # Second sync with changed data
         service.sync_movies(connection)
         
         # Assert no new movie was created (update, not insert)
-        self.assertEqual(len(connection._movies), first_movie_count)
+        self.assertEqual(len(connection._movies), 4)
+        
+        # Assert the synopsis was updated to the new value
+        updated_synopsis = connection._movies["darr-movie-100"]["synopsis"]
+        self.assertEqual(updated_synopsis, "An updated synopsis after a metadata refresh.")
     
     def test_vod_sync_handles_null_optional_fields(self):
         """Test that sync code handles NULL optional fields gracefully."""

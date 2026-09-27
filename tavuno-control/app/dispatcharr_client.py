@@ -2,6 +2,8 @@ import logging
 from typing import Any
 import httpx
 
+from .resilience import with_retry_and_circuit_breaker
+
 logger = logging.getLogger("tavuno-control.dispatcharr")
 
 SENSITIVE_FIELDS = {
@@ -45,6 +47,7 @@ class DispatcharrClient:
             headers["X-API-Key"] = self.api_key
         return headers
 
+    @with_retry_and_circuit_breaker("Dispatcharr", max_attempts=3, failure_threshold=5, cooldown_seconds=30)
     def _get_json(self, path: str, params: dict[str, Any] | None = None, authenticated: bool = True) -> Any:
         url = f"{self.base_url}{path}"
         headers = self._headers() if authenticated else {"Accept": "application/json"}

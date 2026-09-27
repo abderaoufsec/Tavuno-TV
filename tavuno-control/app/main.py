@@ -16,6 +16,7 @@ from .devices.router import router as devices_router
 from .auth.service import AuthService
 from .auth.deps import current_principal, require_admin
 from .catalog.service import CatalogService
+from .session_reaper import reap_expired_sessions
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("tavuno-control")
@@ -28,17 +29,18 @@ async def lifespan(app: FastAPI):
     if getattr(app.state, "services", None) is None:
         app.state.services = Services(get_settings())
     services: Services = app.state.services
-    interval = services.settings.dispatcharr_sync_interval_seconds
+    dispatcharr_interval = services.settings.dispatcharr_sync_interval_seconds
+    session_reaper_interval = services.settings.session_reaper_interval_seconds
     stop = asyncio.Event()
 
     async def periodic_dispatcharr_sync() -> None:
-        if interval <= 0:
+        if dispatcharr_interval <= 0:
             logger.info("Dispatcharr periodic sync disabled")
             return
         if not services.settings.dispatcharr_api_key:
             logger.warning("Dispatcharr periodic sync skipped: DISPATCHARR_API_KEY is not set")
             return
-        logger.info("Dispatcharr periodic sync enabled every %s seconds", interval)
+        logger.info("Dispatcharr periodic sync enabled every %s seconds", dispatcharr_interval)
         while not stop.is_set():
             try:
                 with services.connection() as connection:
@@ -47,16 +49,37 @@ async def lifespan(app: FastAPI):
             except Exception:
                 logger.exception("Dispatcharr periodic sync failed")
             try:
-                await asyncio.wait_for(stop.wait(), timeout=interval)
+                await asyncio.wait_for(stop.wait(), timeout=dispatcharr_interval)
             except TimeoutError:
                 continue
 
-    task = asyncio.create_task(periodic_dispatcharr_sync())
+    async def periodic_session_reaper() -> None:
+        if session_reaper_interval <= 0:
+            logger.info("Session reaper disabled")
+            return
+        logger.info("Session reaper enabled every %s seconds", session_reaper_interval)
+        while not stop.is_set():
+            try:
+                with services.connection() as connection:
+                    reaped_count = reap_expired_sessions(connection)
+                if reaped_count > 0:
+                    logger.info("Session reaper: reaped %d expired sessions", reaped_count)
+            except Exception:
+                logger.exception("Session reaper failed")
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=session_reaper_interval)
+            except TimeoutError:
+                continue
+
+    dispatcharr_task = asyncio.create_task(periodic_dispatcharr_sync())
+    reaper_task = asyncio.create_task(periodic_session_reaper())
     yield
     stop.set()
-    task.cancel()
+    dispatcharr_task.cancel()
+    reaper_task.cancel()
     try:
-        await task
+        await dispatcharr_task
+        await reaper_task
     except asyncio.CancelledError:
         pass
 

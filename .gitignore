@@ -45,3 +45,6 @@ Thumbs.db
 # Temporary
 tmp/
 temp/
+
+# Backups
+tavuno-infra/backups/

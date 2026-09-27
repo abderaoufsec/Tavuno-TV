@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     dispatcharr_sync_interval_seconds: int = Field(default=3600, validation_alias="DISPATCHARR_SYNC_INTERVAL_SECONDS")
     dispatcharr_timeout_seconds: float = Field(default=20.0, validation_alias="DISPATCHARR_TIMEOUT_SECONDS")
 
+    session_reaper_interval_seconds: int = Field(default=60, validation_alias="SESSION_REAPER_INTERVAL_SECONDS")
+
     ome_api_url: str = Field(default="http://tavuno-ovenmediaengine:8081", validation_alias="OME_API_URL")
     ome_api_token: str | None = Field(default=None, validation_alias="OME_API_TOKEN")
     ome_playback_base_url: str = Field(default="http://localhost:8080/media", validation_alias="OME_PLAYBACK_BASE_URL")

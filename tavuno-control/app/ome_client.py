@@ -6,6 +6,8 @@ import time
 from typing import Any
 import httpx
 
+from .resilience import with_retry_and_circuit_breaker
+
 logger = logging.getLogger("tavuno-control.ome")
 
 
@@ -33,6 +35,7 @@ class OmeClient:
             headers["Authorization"] = f"Basic {encoded_token}"
         return headers
 
+    @with_retry_and_circuit_breaker("OME", max_attempts=3, failure_threshold=5, cooldown_seconds=30)
     def get_health(self) -> dict[str, Any]:
         """Probe OME API health."""
         url = f"{self.api_url}/v1/vhosts"
