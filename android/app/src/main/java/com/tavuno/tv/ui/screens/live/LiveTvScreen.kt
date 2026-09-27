@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,18 +29,17 @@ import androidx.tv.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.tavuno.tv.data.model.Channel
 import com.tavuno.tv.data.model.Category
+import com.tavuno.tv.data.model.ChannelNowNext
 import com.tavuno.tv.data.repository.CatalogRepository
 import com.tavuno.tv.ui.theme.TavunoAccent
 import com.tavuno.tv.ui.theme.TavunoSecondary
 
 @Composable
 fun LiveTvScreen(
-    catalogRepository: com.tavuno.tv.data.repository.CatalogRepository,
+    catalogRepository: CatalogRepository,
     onNavigateBack: () -> Unit,
     onNavigateToPlayer: (Int) -> Unit
 ) {
@@ -46,9 +48,12 @@ fun LiveTvScreen(
     var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var categories by remember { mutableStateOf<List<Category>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var channelNowNextMap by remember { mutableStateOf<Map<Int, ChannelNowNext>>(emptyMap()) }
     
-    // Load categories and channels
-    CoroutineScope(Dispatchers.IO).launch {
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Initial load of categories and channels
+    LaunchedEffect(Unit) {
         val categoriesResult = catalogRepository.getCategories(kind = "live")
         categoriesResult.fold(
             onSuccess = { loadedCategories ->
@@ -70,6 +75,42 @@ fun LiveTvScreen(
                 isLoading = false
             }
         )
+    }
+    
+    // Load channels when category changes
+    LaunchedEffect(selectedCategory) {
+        val channelsResult = catalogRepository.getChannels(
+            categoryId = selectedCategory?.id
+        )
+        channelsResult.fold(
+            onSuccess = { loadedChannels ->
+                channels = loadedChannels
+                errorMessage = null
+            },
+            onFailure = { error ->
+                errorMessage = error.message
+            }
+        )
+    }
+    
+    // Fetch EPG now/next for visible channels
+    LaunchedEffect(channels) {
+        channels.forEach { channel ->
+            coroutineScope.launch {
+                val nowNextResult = catalogRepository.getChannelNowNext(channel.id)
+                nowNextResult.fold(
+                    onSuccess = { nowNext ->
+                        channelNowNextMap = channelNowNextMap.toMutableMap().apply {
+                            this[channel.id] = nowNext
+                        }
+                    },
+                    onFailure = {
+                        // Gracefully handle per-channel EPG failures
+                        // Don't show error for individual channel EPG issues
+                    }
+                )
+            }
+        }
     }
     
     Column(
@@ -108,17 +149,6 @@ fun LiveTvScreen(
                 isSelected = selectedCategory == null,
                 onClick = {
                     selectedCategory = null
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val channelsResult = catalogRepository.getChannels()
-                        channelsResult.fold(
-                            onSuccess = { loadedChannels ->
-                                channels = loadedChannels
-                            },
-                            onFailure = { error ->
-                                errorMessage = error.message
-                            }
-                        )
-                    }
                 }
             )
             
@@ -128,17 +158,6 @@ fun LiveTvScreen(
                     isSelected = selectedCategory?.id == category.id,
                     onClick = {
                         selectedCategory = category
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val channelsResult = catalogRepository.getChannels(categoryId = category.id)
-                            channelsResult.fold(
-                                onSuccess = { loadedChannels ->
-                                    channels = loadedChannels
-                                },
-                                onFailure = { error ->
-                                    errorMessage = error.message
-                                }
-                            )
-                        }
                     }
                 )
             }
@@ -154,7 +173,7 @@ fun LiveTvScreen(
                 onRetry = {
                     isLoading = true
                     errorMessage = null
-                    CoroutineScope(Dispatchers.IO).launch {
+                    coroutineScope.launch {
                         val categoriesResult = catalogRepository.getCategories(kind = "live")
                         categoriesResult.fold(
                             onSuccess = { loadedCategories ->
@@ -185,9 +204,11 @@ fun LiveTvScreen(
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(channels) { channel ->
+                items(channels, key = { it.id }) { channel ->
+                    val nowNext = channelNowNextMap[channel.id]
                     ChannelCard(
                         channel = channel,
+                        currentProgram = nowNext?.now?.title,
                         onClick = { onNavigateToPlayer(channel.id) }
                     )
                 }
@@ -217,6 +238,7 @@ fun CategoryChip(
 @Composable
 fun ChannelCard(
     channel: Channel,
+    currentProgram: String?,
     onClick: () -> Unit
 ) {
     com.tavuno.tv.ui.components.FocusableCard(
@@ -237,7 +259,13 @@ fun ChannelCard(
                     text = channel.name,
                     style = MaterialTheme.typography.titleLarge
                 )
-                // TODO: Add current program from EPG
+                if (currentProgram != null) {
+                    Text(
+                        text = currentProgram,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Text(
                 text = "▶",

@@ -83,6 +83,8 @@ The following authentication/authorization defects identified before M9 were rem
 - Category filtering working
 - Channel listing working
 - Navigation to player working
+- EPG now/next display wired into channel cards (M10/M12 gap closure)
+- Compose coroutine anti-pattern fixed (LaunchedEffect instead of CoroutineScope in composable body)
 
 ### M11 — Sports ✅ COMPLETE
 - Sports screen implemented
@@ -98,6 +100,9 @@ The following authentication/authorization defects identified before M9 were rem
 - Seasons/episodes navigation implemented
 - Movie playback authorization complete
 - Episode playback authorization complete
+- VOD sync logic verified against realistic fixtures (M10/M12 gap closure)
+- Human-facing VOD content setup runbook added (docs/M12_VOD_Content_Setup.md)
+- Note: Real VOD content still needs to be added in Dispatcharr by operator following the runbook
 
 ## Incomplete Milestones
 
@@ -145,9 +150,7 @@ The following authentication/authorization defects identified before M9 were rem
 
 ## Remaining Tasks
 
-- EPG now/next display in Live TV screen
 - Runtime verification on Android TV device/emulator
-- Meaningful Android UI/navigation tests
-- Dispatcharr configuration with actual VOD content
-- D-pad navigation runtime testing
-- Back navigation runtime testing
+- D-pad navigation runtime testing (instrumented tests)
+- Back navigation runtime testing (instrumented tests)
+- Real VOD content population in Dispatcharr (operator task - see docs/M12_VOD_Content_Setup.md)

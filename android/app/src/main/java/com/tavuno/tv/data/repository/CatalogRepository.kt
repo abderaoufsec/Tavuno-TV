@@ -147,4 +147,17 @@ class CatalogRepository(private val apiService: TavunoApiService) {
             Result.failure(e)
         }
     }
+    
+    suspend fun getChannelNowNext(channelId: Int): Result<ChannelNowNext> {
+        return try {
+            val response = apiService.getChannelNowNext(channelId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to load channel now/next"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
