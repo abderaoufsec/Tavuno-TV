@@ -31,6 +31,7 @@ class FakeSettings:
     playback_token_secret = "test-secret-key"
     playback_token_ttl_seconds = 120
     ome_playback_base_url = "http://localhost:8080/media"
+    ome_dvr_max_duration_seconds = 3600
     dispatcharr_expected_version = "0.28.0"
     dispatcharr_api_key = "test-key"
     email_enabled = False

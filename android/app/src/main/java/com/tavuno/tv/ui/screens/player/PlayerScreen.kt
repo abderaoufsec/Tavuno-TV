@@ -31,6 +31,7 @@ import androidx.tv.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import androidx.compose.material3.Slider
 import com.tavuno.tv.data.repository.PlaybackRepository
 import com.tavuno.tv.ui.theme.TavunoAccent
 import com.tavuno.tv.ui.theme.TavunoSecondary
@@ -52,6 +53,8 @@ fun PlayerScreen(
     var playbackUrl by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var sessionId by remember { mutableStateOf<Int?>(null) }
+    var dvrEnabled by remember { mutableStateOf(false) }
+    var maxRewindSeconds by remember { mutableStateOf(0) }
     
     // ExoPlayer setup
     val exoPlayer = remember {
@@ -118,6 +121,8 @@ fun PlayerScreen(
                 onSuccess = { auth ->
                     playbackUrl = auth.playback.url
                     sessionId = auth.sessionId
+                    dvrEnabled = auth.playback.dvrEnabled
+                    maxRewindSeconds = auth.playback.maxRewindSeconds
                     isLoading = false
                     
                     // Start playback
@@ -163,6 +168,47 @@ fun PlayerScreen(
                 .fillMaxSize()
                 .weight(1f)
         )
+        
+        // DVR seek bar (only for live content with DVR enabled)
+        if (contentType == "live" && dvrEnabled && !isLoading && errorMessage == null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = {
+                        // Rewind 30 seconds
+                        val currentPosition = exoPlayer.currentPosition
+                        exoPlayer.seekTo((currentPosition - 30000).coerceAtLeast(0))
+                    },
+                    colors = ButtonDefaults.colors(
+                        containerColor = TavunoSecondary
+                    ),
+                    modifier = Modifier.width(100.dp)
+                ) {
+                    Text("-30s")
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                Button(
+                    onClick = {
+                        // Rewind 10 seconds
+                        val currentPosition = exoPlayer.currentPosition
+                        exoPlayer.seekTo((currentPosition - 10000).coerceAtLeast(0))
+                    },
+                    colors = ButtonDefaults.colors(
+                        containerColor = TavunoSecondary
+                    ),
+                    modifier = Modifier.width(100.dp)
+                ) {
+                    Text("-10s")
+                }
+            }
+        }
         
         // Controls overlay
         Row(

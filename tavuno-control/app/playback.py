@@ -283,6 +283,8 @@ def authorize_live_playback(
             "protocol": "hls",
             "url": playback_url,
             "stream_name": stream_name,
+            "dvr_enabled": True,
+            "max_rewind_seconds": settings.ome_dvr_max_duration_seconds,
         },
     }
 

@@ -86,6 +86,11 @@
                             <ChunkDuration>0.5</ChunkDuration>
                             <SegmentDuration>2</SegmentDuration>
                             <SegmentCount>6</SegmentCount>
+                            <DVR>
+                                <Enable>true</Enable>
+                                <TempStoragePath>/opt/ovenmediaengine/dvr</TempStoragePath>
+                                <MaxDuration>${OME_DVR_MAX_DURATION_SECONDS:-3600}</MaxDuration>
+                            </DVR>
                         </LLHLS>
                         <WebRTC />
                     </Publishers>

@@ -18,7 +18,11 @@ data class PlaybackInfo(
     val protocol: String,
     val url: String,
     @SerializedName("stream_name")
-    val streamName: String
+    val streamName: String,
+    @SerializedName("dvr_enabled")
+    val dvrEnabled: Boolean = false,
+    @SerializedName("max_rewind_seconds")
+    val maxRewindSeconds: Int = 0
 )
 
 data class MoviePlaybackAuthorization(

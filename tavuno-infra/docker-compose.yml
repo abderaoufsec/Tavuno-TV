@@ -189,8 +189,12 @@ services:
       - "9999:9999/udp"
       - "10000-10009:10000-10009/udp"
 
+    environment:
+      OME_DVR_MAX_DURATION_SECONDS: ${OME_DVR_MAX_DURATION_SECONDS:-3600}
+
     volumes:
       - ./docker/ome/conf:/opt/ovenmediaengine/bin/origin_conf
+      - tavuno_ome_dvr_storage:/opt/ovenmediaengine/dvr
 
     networks:
       - tavuno-internal
@@ -353,6 +357,9 @@ volumes:
 
   tavuno_caddy_config:
     name: tavuno_caddy_config
+
+  tavuno_ome_dvr_storage:
+    name: tavuno_ome_dvr_storage
 
 
 

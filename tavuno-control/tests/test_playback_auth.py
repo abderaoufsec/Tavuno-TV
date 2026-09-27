@@ -15,6 +15,7 @@ class FakeSettings:
     playback_token_secret = "test-secret-key"
     playback_token_ttl_seconds = 120
     ome_playback_base_url = "http://localhost:8080/media"
+    ome_dvr_max_duration_seconds = 3600
 
 
 class FakeConnection:
@@ -45,6 +46,8 @@ class FakeConnection:
             return {"id": 5, "max_concurrent_streams": 2, "max_devices": 3}
         if "FROM tavuno_channels" in self.query and "WHERE id = %s" in self.query:
             return {"id": 1, "name": "Test Channel", "slug": "test-channel"}
+        if "FROM tavuno_entitlements" in self.query:
+            return {"id": 1}
         if "FROM tavuno_channel_sources" in self.query:
             return {"provider": "ome", "external_id": "channel_1"}
         if "FROM tavuno_movies" in self.query and "WHERE id = %s" in self.query:
@@ -113,6 +116,25 @@ class PlaybackAuthTests(unittest.TestCase):
         
         self.assertEqual(ctx.exception.status_code, 401)
         self.assertIn("signature", str(ctx.exception.detail).lower())
+
+    def test_live_playback_includes_dvr_fields(self):
+        """Test that live playback response includes DVR capability fields (M13)."""
+        conn = FakeConnection()
+        
+        result = authorize_live_playback(
+            profile_id=1,
+            device_key="test-device-key",
+            channel_id=1,
+            connection=conn,
+            settings=self.settings
+        )
+        
+        # Verify DVR fields are present
+        self.assertIn("playback", result)
+        self.assertIn("dvr_enabled", result["playback"])
+        self.assertTrue(result["playback"]["dvr_enabled"])
+        self.assertIn("max_rewind_seconds", result["playback"])
+        self.assertEqual(result["playback"]["max_rewind_seconds"], 3600)
 
 
 if __name__ == "__main__":
