@@ -6,6 +6,14 @@ from typing import Any
 from fastapi import HTTPException, status, Header
 import jwt
 
+
+def _int(value: Any) -> int | None:
+    """Safely convert value to int or return None."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 logger = logging.getLogger("tavuno-control.playback")
 
 JWT_SECRET = "tavuno-jwt-secret-key"
@@ -242,9 +250,36 @@ def authorize_live_playback(
         (channel_id,),
     ).fetchone()
 
+    # Determine playback mode
+    playback_mode = "ome_dvr"  # Default to OME/DVR
+    direct_hls_url = None
     stream_name = f"channel_{channel_id}"
-    if source and source["provider"] == "ome":
-        stream_name = source["external_id"]
+
+    if source:
+        if source["provider"] == "ome":
+            stream_name = source["external_id"]
+            playback_mode = "ome_dvr"
+        elif source["provider"] == "dispatcharr":
+            # Try to fetch direct HLS URL from Dispatcharr
+            try:
+                # Import here to avoid circular dependency
+                from .dispatcharr_client import DispatcharrClient
+                dispatcharr = DispatcharrClient(
+                    base_url=settings.dispatcharr_url,
+                    api_key=settings.dispatcharr_api_key,
+                    timeout=settings.dispatcharr_timeout_seconds,
+                )
+                stream_id = _int(source["external_id"])
+                if stream_id:
+                    stream_data = dispatcharr.get_stream_by_id(stream_id)
+                    if stream_data and stream_data.get("url"):
+                        direct_hls_url = stream_data["url"]
+                        playback_mode = "direct_hls"
+                        logger.info("Using direct HLS playback for channel %s from Dispatcharr stream %s", channel_id, stream_id)
+            except Exception as exc:
+                logger.warning("Failed to fetch Dispatcharr stream for channel %s: %s", channel_id, exc)
+                # Fall back to OME/DVR if Dispatcharr fetch fails
+                playback_mode = "ome_dvr"
 
     # 6. Create session
     ttl = settings.playback_token_ttl_seconds
@@ -262,17 +297,27 @@ def authorize_live_playback(
     expires_at_dt = session_row["expires_at"]
     expires_ts = int(time.time()) + ttl
 
-    # 7. Mint token
-    token = mint_token(
-        session_id=session_id,
-        device_id=device_id,
-        content_type="live",
-        content_key=str(channel_id),
-        expires_at=expires_ts,
-        secret=settings.playback_token_secret,
-    )
-
-    playback_url = f"{settings.ome_playback_base_url}/tavuno/{stream_name}/llhls.m3u8?token={token}"
+    # 7. Build playback response based on mode
+    if playback_mode == "direct_hls" and direct_hls_url:
+        # Direct HLS mode - no DVR, no token wrapping
+        playback_url = direct_hls_url
+        dvr_enabled = False
+        max_rewind_seconds = 0
+        protocol = "http_hls"
+    else:
+        # OME/DVR mode - mint token and wrap through OME
+        token = mint_token(
+            session_id=session_id,
+            device_id=device_id,
+            content_type="live",
+            content_key=str(channel_id),
+            expires_at=expires_ts,
+            secret=settings.playback_token_secret,
+        )
+        playback_url = f"{settings.ome_playback_base_url}/tavuno/{stream_name}/llhls.m3u8?token={token}"
+        dvr_enabled = True
+        max_rewind_seconds = settings.ome_dvr_max_duration_seconds
+        protocol = "hls"
 
     return {
         "session_id": session_id,
@@ -280,11 +325,11 @@ def authorize_live_playback(
         "channel_name": channel["name"],
         "expires_at": expires_at_dt.isoformat() if hasattr(expires_at_dt, "isoformat") else str(expires_at_dt),
         "playback": {
-            "protocol": "hls",
+            "protocol": protocol,
             "url": playback_url,
             "stream_name": stream_name,
-            "dvr_enabled": True,
-            "max_rewind_seconds": settings.ome_dvr_max_duration_seconds,
+            "dvr_enabled": dvr_enabled,
+            "max_rewind_seconds": max_rewind_seconds,
         },
     }
 

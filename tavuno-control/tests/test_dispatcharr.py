@@ -50,3 +50,35 @@ class DispatcharrClientTests(unittest.TestCase):
 
         groups = self._client(handler).get_channel_groups()
         self.assertEqual(groups[0]["name"], "Sports")
+
+    def test_get_stream_by_id(self):
+        """Test fetching a specific stream by ID."""
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "/streams/123/" in str(request.url):
+                return httpx.Response(
+                    200,
+                    json={
+                        "id": 123,
+                        "name": "Test Stream",
+                        "url": "https://example.com/stream.m3u8",
+                        "tvg_id": "test.tv"
+                    }
+                )
+            return httpx.Response(404, json={"detail": "Not found"})
+
+        client = self._client(handler)
+        stream = client.get_stream_by_id(123)
+        self.assertIsNotNone(stream)
+        self.assertEqual(stream["id"], 123)
+        self.assertEqual(stream["name"], "Test Stream")
+        # URL should be redacted
+        self.assertNotIn("url", stream)
+
+    def test_get_stream_by_id_not_found(self):
+        """Test get_stream_by_id returns None for non-existent stream."""
+        def handler(_: httpx.Request) -> httpx.Response:
+            return httpx.Response(404, json={"detail": "Not found"})
+
+        client = self._client(handler)
+        stream = client.get_stream_by_id(999)
+        self.assertIsNone(stream)
