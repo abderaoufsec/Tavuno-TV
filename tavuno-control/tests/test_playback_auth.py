@@ -154,17 +154,13 @@ class PlaybackAuthTests(unittest.TestCase):
         # Mock Dispatcharr client to return a stream URL
         with patch('app.dispatcharr_client.DispatcharrClient') as mock_dispatcharr_client_class:
             mock_dispatcharr = MagicMock()
-            mock_dispatcharr.get_stream_by_id.return_value = {
-                "id": 123,
-                "url": "https://example.com/stream.m3u8",
-                "name": "Test Stream"
-            }
+            mock_dispatcharr.get_stream_url_by_id.return_value = "https://example.com/stream.m3u8"
             mock_dispatcharr_client_class.return_value = mock_dispatcharr
 
             conn = FakeConnection()
             conn.channel_source_provider = "dispatcharr"
             conn.channel_source_external_id = "123"
-            
+
             result = authorize_live_playback(
                 profile_id=1,
                 device_key="test-device-key",
@@ -172,7 +168,7 @@ class PlaybackAuthTests(unittest.TestCase):
                 connection=conn,
                 settings=self.settings
             )
-            
+
             # Verify direct HLS mode
             self.assertIn("playback", result)
             self.assertEqual(result["playback"]["protocol"], "http_hls")
@@ -235,13 +231,13 @@ class PlaybackAuthTests(unittest.TestCase):
         with patch('app.dispatcharr_client.DispatcharrClient') as mock_dispatcharr_client_class:
             # Mock Dispatcharr client to raise an exception
             mock_dispatcharr = MagicMock()
-            mock_dispatcharr.get_stream_by_id.side_effect = Exception("API error")
+            mock_dispatcharr.get_stream_url_by_id.side_effect = Exception("API error")
             mock_dispatcharr_client_class.return_value = mock_dispatcharr
 
             conn = FakeConnection()
             conn.channel_source_provider = "dispatcharr"
             conn.channel_source_external_id = "123"
-            
+
             result = authorize_live_playback(
                 profile_id=1,
                 device_key="test-device-key",
@@ -249,7 +245,7 @@ class PlaybackAuthTests(unittest.TestCase):
                 connection=conn,
                 settings=self.settings
             )
-            
+
             # Should fall back to OME/DVR on fetch failure
             self.assertIn("playback", result)
             self.assertEqual(result["playback"]["protocol"], "hls")
