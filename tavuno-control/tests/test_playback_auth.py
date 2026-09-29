@@ -19,6 +19,7 @@ class FakeSettings:
     dispatcharr_url = "http://dispatcharr:9191"
     dispatcharr_api_key = "test-key"
     dispatcharr_timeout_seconds = 20.0
+    playback_public_host = None
 
 
 class FakeConnection:
@@ -40,6 +41,20 @@ class FakeConnection:
     def commit(self):
         self.commit_called = True
 
+    def fetchall(self):
+        if "FROM tavuno_channel_sources" in self.query:
+            extra = getattr(self, "extra_channel_sources", [])
+            if self.channel_source_provider is None:
+                return list(extra)
+            return [
+                {
+                    "provider": self.channel_source_provider,
+                    "external_id": self.channel_source_external_id,
+                    "priority": 1,
+                }
+            ] + list(extra)
+        return []
+
     def fetchone(self):
         self.fetchone_call_count += 1
         if "FROM tavuno_profiles" in self.query:
@@ -48,7 +63,7 @@ class FakeConnection:
             # Return None to simulate deleted device
             if self.parameters == ("deleted-device-key", 1):
                 return None
-            return {"id": 10, "is_active": True}
+            return {"id": 10, "is_active": True, "platform": getattr(self, "device_platform", "test")}
         if "FROM tavuno_subscriptions" in self.query:
             if not self.has_subscription:
                 return None
@@ -155,6 +170,7 @@ class PlaybackAuthTests(unittest.TestCase):
         with patch('app.dispatcharr_client.DispatcharrClient') as mock_dispatcharr_client_class:
             mock_dispatcharr = MagicMock()
             mock_dispatcharr.get_stream_url_by_id.return_value = "https://example.com/stream.m3u8"
+            mock_dispatcharr.stream_url_is_playable.return_value = True
             mock_dispatcharr_client_class.return_value = mock_dispatcharr
 
             conn = FakeConnection()
@@ -282,6 +298,42 @@ class PlaybackAuthTests(unittest.TestCase):
             )
         
         self.assertIn("subscription", str(ctx.exception).lower())
+
+    def test_unreachable_dispatcharr_url_falls_back_to_ome_dvr(self):
+        with patch("app.dispatcharr_client.DispatcharrClient") as mock_dispatcharr_client_class:
+            mock_dispatcharr = MagicMock()
+            mock_dispatcharr.get_stream_url_by_id.return_value = "https://example.com/dead.m3u8"
+            mock_dispatcharr.stream_url_is_playable.return_value = False
+            mock_dispatcharr_client_class.return_value = mock_dispatcharr
+
+            conn = FakeConnection()
+            conn.channel_source_provider = "dispatcharr"
+            conn.channel_source_external_id = "123"
+
+            result = authorize_live_playback(
+                profile_id=1,
+                device_key="test-device-key",
+                channel_id=1,
+                connection=conn,
+                settings=self.settings,
+            )
+
+            self.assertEqual(result["playback"]["protocol"], "hls")
+            self.assertTrue(result["playback"]["dvr_enabled"])
+
+    def test_android_device_rewrites_ome_localhost(self):
+        conn = FakeConnection()
+        conn.device_platform = "android-tv"
+
+        result = authorize_live_playback(
+            profile_id=1,
+            device_key="test-device-key",
+            channel_id=1,
+            connection=conn,
+            settings=self.settings,
+        )
+        self.assertIn("10.0.2.2:8080", result["playback"]["url"])
+        self.assertNotIn("localhost:8080", result["playback"]["url"])
 
 
 if __name__ == "__main__":

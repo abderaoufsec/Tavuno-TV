@@ -37,6 +37,8 @@ class RecordingConnection:
     def fetchall(self):
         if "provider = 'dispatcharr'" in self.query:
             return [{"channel": 1, "external_id": "10"}]
+        if "SELECT id, name FROM tavuno_channels" in self.query:
+            return [{"id": 1, "name": "Tavuno News"}]
         return []
 
     def fetchone(self):
@@ -99,9 +101,7 @@ class FakeDispatcharr:
         return [{"id": 99, "name": "News A", "channel_id": 10, "url": "http://should-not-be-used"}]
 
     def get_channel_streams(self, channel_id: int):
-        if channel_id == 10:
-            return [{"id": 99, "name": "News A", "url": "http://stream.example.com/stream.ts"}]
-        return []
+        raise AssertionError("per-channel streams endpoint should not be used")
 
     def get_epg_programs(self):
         return [

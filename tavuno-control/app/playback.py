@@ -3,6 +3,7 @@ import hmac
 import logging
 import time
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 from fastapi import HTTPException, status, Header
 import jwt
 
@@ -15,6 +16,25 @@ def _int(value: Any) -> int | None:
         return None
 
 logger = logging.getLogger("tavuno-control.playback")
+
+ANDROID_LOOPBACK_HOST = "10.0.2.2"
+
+
+def rewrite_loopback_playback_url(url: str, platform: str | None, public_host: str | None) -> str:
+    """Rewrite localhost/127.0.0.1 playback URLs so Android clients can reach the host."""
+    if not url:
+        return url
+    parsed = urlparse(url)
+    if parsed.hostname not in {"localhost", "127.0.0.1"}:
+        return url
+    platform_norm = (platform or "").lower().replace("_", "-")
+    is_android = platform_norm.startswith("android")
+    host = (public_host or "").strip() or (ANDROID_LOOPBACK_HOST if is_android else "")
+    if not host:
+        return url
+    netloc = f"{host}:{parsed.port}" if parsed.port else host
+    return urlunparse(parsed._replace(netloc=netloc))
+
 
 JWT_SECRET = "tavuno-jwt-secret-key"
 JWT_ALGORITHM = "HS256"
@@ -165,7 +185,7 @@ def authorize_live_playback(
 
     # 2. Device check (device_id comes from JWT, should always be registered)
     device = connection.execute(
-        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+        "SELECT id, is_active, platform FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
     ).fetchone()
     if not device or not device["is_active"]:
@@ -174,6 +194,7 @@ def authorize_live_playback(
             detail="device_not_registered",
         )
     device_id = device["id"]
+    device_platform = device.get("platform") if isinstance(device, dict) else None
 
     # 3. Subscription & entitlement check
     sub = connection.execute(
@@ -239,46 +260,89 @@ def authorize_live_playback(
             detail="Channel not included in subscription entitlements",
         )
 
-    # Resolve stream source (Dispatcharr or OME mapping)
-    source = connection.execute(
+    # Resolve stream sources (Dispatcharr stream IDs and/or OME mapping)
+    source_rows = []
+    source_result = connection.execute(
         """
-        SELECT provider, external_id
+        SELECT provider, external_id, priority
         FROM tavuno_channel_sources
         WHERE channel = %s AND is_active = TRUE
-        ORDER BY priority ASC LIMIT 1
+        ORDER BY priority ASC
         """,
         (channel_id,),
-    ).fetchone()
+    )
+    if hasattr(source_result, "fetchall"):
+        source_rows = source_result.fetchall() or []
+    elif hasattr(source_result, "fetchone"):
+        row = source_result.fetchone()
+        source_rows = [row] if row else []
+
+    source_rows.sort(
+        key=lambda s: (
+            0 if (s or {}).get("provider") == "dispatcharr-stream" else
+            1 if (s or {}).get("provider") == "dispatcharr" else 2,
+            (s or {}).get("priority") or 0,
+        )
+    )
 
     # Determine playback mode
     playback_mode = "ome_dvr"  # Default to OME/DVR
     direct_hls_url = None
     stream_name = f"channel_{channel_id}"
+    candidate_stream_ids: list[int] = []
 
-    if source:
-        if source["provider"] == "ome":
-            stream_name = source["external_id"]
+    for source in source_rows:
+        if not source:
+            continue
+        provider = source.get("provider")
+        if provider == "ome":
+            stream_name = source["external_id"] or stream_name
             playback_mode = "ome_dvr"
-        elif source["provider"] == "dispatcharr":
-            # Try to fetch direct HLS URL from Dispatcharr
-            try:
-                # Import here to avoid circular dependency
-                from .dispatcharr_client import DispatcharrClient
-                dispatcharr = DispatcharrClient(
-                    base_url=settings.dispatcharr_url,
-                    api_key=settings.dispatcharr_api_key,
-                    timeout=settings.dispatcharr_timeout_seconds,
+        elif provider in {"dispatcharr", "dispatcharr-stream"}:
+            stream_id = _int(source.get("external_id"))
+            if stream_id is not None:
+                candidate_stream_ids.append(stream_id)
+
+    if candidate_stream_ids:
+        try:
+            from .dispatcharr_client import DispatcharrClient
+
+            dispatcharr = DispatcharrClient(
+                base_url=settings.dispatcharr_url,
+                api_key=settings.dispatcharr_api_key,
+                timeout=settings.dispatcharr_timeout_seconds,
+            )
+            seen: set[int] = set()
+            for stream_id in candidate_stream_ids:
+                if stream_id in seen:
+                    continue
+                seen.add(stream_id)
+                url = dispatcharr.get_stream_url_by_id(stream_id)
+                if not url:
+                    continue
+                playable = True
+                if hasattr(dispatcharr, "stream_url_is_playable"):
+                    playable = bool(dispatcharr.stream_url_is_playable(url))
+                if not playable:
+                    logger.warning(
+                        "Skipping unreachable Dispatcharr stream %s for channel %s",
+                        stream_id,
+                        channel_id,
+                    )
+                    continue
+                direct_hls_url = url
+                playback_mode = "direct_hls"
+                logger.info(
+                    "Using direct HLS playback for channel %s from Dispatcharr stream %s",
+                    channel_id,
+                    stream_id,
                 )
-                stream_id = _int(source["external_id"])
-                if stream_id:
-                    direct_hls_url = dispatcharr.get_stream_url_by_id(stream_id)
-                    if direct_hls_url:
-                        playback_mode = "direct_hls"
-                        logger.info("Using direct HLS playback for channel %s from Dispatcharr stream %s", channel_id, stream_id)
-            except Exception as exc:
-                logger.warning("Failed to fetch Dispatcharr stream for channel %s: %s", channel_id, exc)
-                # Fall back to OME/DVR if Dispatcharr fetch fails
+                break
+            if not direct_hls_url:
                 playback_mode = "ome_dvr"
+        except Exception as exc:
+            logger.warning("Failed to fetch Dispatcharr stream for channel %s: %s", channel_id, exc)
+            playback_mode = "ome_dvr"
 
     # 6. Create session
     ttl = settings.playback_token_ttl_seconds
@@ -317,6 +381,9 @@ def authorize_live_playback(
         dvr_enabled = True
         max_rewind_seconds = settings.ome_dvr_max_duration_seconds
         protocol = "hls"
+
+    public_host = getattr(settings, "playback_public_host", None)
+    playback_url = rewrite_loopback_playback_url(playback_url, device_platform, public_host)
 
     return {
         "session_id": session_id,
@@ -421,7 +488,7 @@ def authorize_movie_playback(
 
     # 2. Device check (device_id comes from JWT, should always be registered)
     device = connection.execute(
-        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+        "SELECT id, is_active, platform FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
     ).fetchone()
     if not device or not device["is_active"]:
@@ -558,7 +625,7 @@ def authorize_episode_playback(
 
     # 2. Device check (device_id comes from JWT, should always be registered)
     device = connection.execute(
-        "SELECT id, is_active FROM tavuno_devices WHERE device_key = %s AND profile = %s",
+        "SELECT id, is_active, platform FROM tavuno_devices WHERE device_key = %s AND profile = %s",
         (device_key, profile_id),
     ).fetchone()
     if not device or not device["is_active"]:

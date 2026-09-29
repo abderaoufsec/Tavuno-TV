@@ -51,8 +51,7 @@ def _int(value: Any) -> int | None:
 
 def _stream_dispatcharr_channel_ids(stream: dict[str, Any]) -> list[int]:
     ids: list[int] = []
-    # Dispatcharr 0.28 uses channel_group for streams, not channel_id
-    for key in ("channel", "channel_id", "channel_group"):
+    for key in ("channel", "channel_id"):
         value = stream.get(key)
         if value is None:
             continue
@@ -344,8 +343,21 @@ class SyncService:
                     else:
                         logger.warning("EPG channel with external_id %s already exists for another channel, skipping", tvg_id)
         
-        # Deactivate channels that are no longer in Dispatcharr
-        if active_dispatcharr_ids:
+        # Deactivate channels that are no longer in Dispatcharr, unless the
+        # upstream channel list is clearly a subset of an existing catalog
+        # (this lab's Dispatcharr instance currently exposes ~12 channels but
+        # thousands of streams already imported as Tavuno channels).
+        existing_active = connection.execute(
+            "SELECT COUNT(*) AS count FROM tavuno_channels WHERE is_active = TRUE"
+        ).fetchone()
+        existing_count = int((existing_active or {}).get("count") or 0)
+        if active_dispatcharr_ids and existing_count > max(len(active_dispatcharr_ids) * 5, 50):
+            logger.warning(
+                "Skipping channel deactivation: Dispatcharr returned %s channels but Tavuno has %s active channels",
+                len(active_dispatcharr_ids),
+                existing_count,
+            )
+        elif active_dispatcharr_ids:
             placeholders = ",".join(["%s"] * len(active_dispatcharr_ids))
             deactivated = connection.execute(
                 f"""
@@ -376,27 +388,55 @@ class SyncService:
 
     def sync_stream_mappings(self, connection: Any) -> int:
         channel_map = self._tavuno_channel_id_by_dispatcharr_id(connection)
+        name_map: dict[str, int] = {}
+        try:
+            channel_rows = connection.execute(
+                "SELECT id, name FROM tavuno_channels WHERE is_active = TRUE"
+            ).fetchall()
+            for row in channel_rows or []:
+                name = _text(row.get("name"))
+                if name:
+                    name_map[name.strip().lower()] = row["id"]
+        except Exception:
+            logger.debug("Could not load channel names for stream mapping")
+
         synced = 0
-        active_stream_ids = set()
-        
-        # Use per-channel fetch for reliability with Dispatcharr 0.28
-        for dispatcharr_id, tavuno_id in channel_map.items():
-            try:
-                streams = self.client.get_channel_streams(int(dispatcharr_id))
-                for stream in streams:
-                    stream_id = _int(stream.get("id"))
-                    if stream_id is None:
-                        continue
-                    active_stream_ids.add(str(stream_id))
-                    # Skip streams with missing required fields
-                    if not stream.get("url") and not stream.get("source"):
-                        logger.debug("Skipping stream %s: missing URL/source", stream_id)
-                        continue
-                    if self._ensure_source(connection, tavuno_id, "dispatcharr-stream", str(stream_id), 10):
-                        synced += 1
-            except Exception as exc:
-                logger.warning("Could not fetch streams for Dispatcharr channel %s: %s", dispatcharr_id, exc)
-        
+        active_stream_ids: set[str] = set()
+
+        try:
+            streams = self.client.get_all_streams()
+        except Exception as exc:
+            logger.warning("Could not fetch streams from Dispatcharr /api/channels/streams/: %s", exc)
+            return 0
+
+        for stream in streams:
+            stream_id = _int(stream.get("id"))
+            if stream_id is None:
+                continue
+
+            tavuno_ids: list[int] = []
+            mapped = channel_map.get(str(stream_id))
+            if mapped is not None:
+                tavuno_ids.append(mapped)
+            for dispatcharr_channel_id in _stream_dispatcharr_channel_ids(stream):
+                mapped_channel = channel_map.get(str(dispatcharr_channel_id))
+                if mapped_channel is not None:
+                    tavuno_ids.append(mapped_channel)
+            stream_name = _text(stream.get("name"))
+            if stream_name:
+                named = name_map.get(stream_name.strip().lower())
+                if named is not None:
+                    tavuno_ids.append(named)
+
+            unique_ids = list(dict.fromkeys(tavuno_ids))
+            if not unique_ids:
+                continue
+
+            active_stream_ids.add(str(stream_id))
+            for tavuno_id in unique_ids:
+                if self._ensure_source(connection, tavuno_id, "dispatcharr-stream", str(stream_id), 0):
+                    synced += 1
+
         # Deactivate stream mappings that are no longer in Dispatcharr
         if active_stream_ids:
             placeholders = ",".join(["%s"] * len(active_stream_ids))
@@ -409,9 +449,9 @@ class SyncService:
                 """,
                 tuple(active_stream_ids),
             )
-            if hasattr(deactivated, 'rowcount') and deactivated.rowcount > 0:
+            if hasattr(deactivated, "rowcount") and deactivated.rowcount > 0:
                 logger.info("Deactivated %d stream mappings no longer in Dispatcharr", deactivated.rowcount)
-        
+
         logger.info("Stream mappings sync: %d mappings processed", synced)
         return synced
 

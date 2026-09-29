@@ -24,7 +24,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
@@ -33,6 +37,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.material3.Slider
 import com.tavuno.tv.data.repository.PlaybackRepository
+import com.tavuno.tv.playback.PlaybackUrls
 import com.tavuno.tv.ui.theme.TavunoAccent
 import com.tavuno.tv.ui.theme.TavunoSecondary
 import kotlinx.coroutines.CoroutineScope
@@ -55,15 +60,34 @@ fun PlayerScreen(
     var sessionId by remember { mutableStateOf<Int?>(null) }
     var dvrEnabled by remember { mutableStateOf(false) }
     var maxRewindSeconds by remember { mutableStateOf(0) }
+    var playerError by remember { mutableStateOf<String?>(null) }
     
     // ExoPlayer setup
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            setHandleAudioBecomingNoisy(true)
-        }
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("TavunoTV/1.0 (Linux; Android TV)")
+            .setAllowCrossProtocolRedirects(true)
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .build()
+            .apply {
+                setHandleAudioBecomingNoisy(true)
+            }
     }
     
     val lifecycleOwner = LocalLifecycleOwner.current
+    
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                playerError = error.message ?: "Playback failed"
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
+        }
+    }
     
     // Heartbeat job
     val heartbeatJob = remember { mutableStateOf<Job?>(null) }
@@ -119,15 +143,17 @@ fun PlayerScreen(
             
             result.fold(
                 onSuccess = { auth ->
-                    playbackUrl = auth.playback.url
+                    val playableUrl = PlaybackUrls.rewriteLoopbackForEmulator(auth.playback.url)
+                    playbackUrl = playableUrl
                     sessionId = auth.sessionId
                     dvrEnabled = auth.playback.dvrEnabled
                     maxRewindSeconds = auth.playback.maxRewindSeconds
                     isLoading = false
+                    playerError = null
                     
                     // Start playback
-                    if (playbackUrl != null) {
-                        val mediaItem = MediaItem.fromUri(playbackUrl!!)
+                    if (playableUrl.isNotBlank()) {
+                        val mediaItem = MediaItem.fromUri(playableUrl)
                         exoPlayer.setMediaItem(mediaItem)
                         exoPlayer.prepare()
                         exoPlayer.play()
@@ -229,9 +255,9 @@ fun PlayerScreen(
             
             if (isLoading) {
                 CircularProgressIndicator(color = TavunoAccent)
-            } else if (errorMessage != null) {
+            } else if (errorMessage != null || playerError != null) {
                 Text(
-                    text = errorMessage!!,
+                    text = errorMessage ?: playerError ?: "",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium
                 )

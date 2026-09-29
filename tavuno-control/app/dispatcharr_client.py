@@ -33,6 +33,48 @@ def redact_record(record: Any) -> Any:
     return cleaned
 
 
+def probe_stream_url(url: str, timeout: float = 5.0) -> tuple[bool, str]:
+    """Best-effort reachability check for a Dispatcharr HLS/media URL.
+
+    Uses a short GET (not HEAD) because many provider gateways reject HEAD or
+    hang until a full playlist/segment is requested.
+    """
+    if not url:
+        return False, "empty_url"
+    headers = {
+        "User-Agent": "TavunoTV/1.0",
+        "Accept": "*/*",
+    }
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
+            with client.stream("GET", url) as response:
+                if response.status_code >= 400:
+                    return False, f"http_{response.status_code}"
+                content_type = (response.headers.get("content-type") or "").lower()
+                prefix = b""
+                for chunk in response.iter_bytes(chunk_size=512):
+                    prefix += chunk
+                    if len(prefix) >= 512:
+                        break
+                text = prefix.decode("utf-8", errors="ignore")
+                lowered = text.lower()
+                if "<html" in lowered:
+                    return False, "html_error_page"
+                if "hev1" in lowered or "hvc1" in lowered:
+                    logger.warning(
+                        "HLS playlist advertises HEVC (hvc1/hev1); some Android TV devices may not decode this stream"
+                    )
+                if "#EXTM3U" in text or "mpegurl" in content_type or "mpeg-ts" in content_type:
+                    return True, "ok"
+                if prefix[:1] == b"\x47":
+                    return True, "ok"
+                if response.status_code in (200, 206):
+                    return True, "ok"
+                return False, "unrecognized_payload"
+    except Exception as exc:
+        return False, type(exc).__name__
+
+
 class DispatcharrClient:
     """Read-only client for Dispatcharr IPTV middleware (M4)."""
 
@@ -120,6 +162,13 @@ class DispatcharrClient:
         except Exception as exc:
             logger.warning("Could not fetch stream URL for %s from Dispatcharr: %s", stream_id, exc)
             return None
+
+    def stream_url_is_playable(self, url: str, timeout: float = 5.0) -> bool:
+        """Return True if the URL currently responds with a media/HLS payload."""
+        ok, reason = probe_stream_url(url, timeout=timeout)
+        if not ok:
+            logger.warning("Dispatcharr stream URL is not currently playable (%s)", reason)
+        return ok
 
     def get_all_streams(self, max_pages: int = 50) -> list[dict[str, Any]]:
         return self.get_paginated("/api/channels/streams/", max_pages=max_pages)

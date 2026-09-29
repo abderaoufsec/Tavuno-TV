@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     ome_api_token: str | None = Field(default=None, validation_alias="OME_API_TOKEN")
     ome_playback_base_url: str = Field(default="http://localhost:8080/media", validation_alias="OME_PLAYBACK_BASE_URL")
     ome_dvr_max_duration_seconds: int = Field(default=3600, validation_alias="OME_DVR_MAX_DURATION_SECONDS")
+    # Host used to replace localhost/127.0.0.1 in playback URLs for Android emulators/devices.
+    playback_public_host: str | None = Field(default=None, validation_alias="PLAYBACK_PUBLIC_HOST")
 
     playback_token_secret: str = Field(default="tavuno-playback-secret-key", validation_alias="PLAYBACK_TOKEN_SECRET")
     playback_token_ttl_seconds: int = Field(default=120, validation_alias="PLAYBACK_TOKEN_TTL_SECONDS")

@@ -82,3 +82,10 @@ class DispatcharrClientTests(unittest.TestCase):
         client = self._client(handler)
         stream = client.get_stream_by_id(999)
         self.assertIsNone(stream)
+
+    def test_get_stream_url_by_id_returns_unredacted_url(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"id": 123, "url": "https://example.com/live.m3u8"})
+
+        url = self._client(handler).get_stream_url_by_id(123)
+        self.assertEqual(url, "https://example.com/live.m3u8")

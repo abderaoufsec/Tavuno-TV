@@ -52,6 +52,8 @@ class AuthInterceptor : Interceptor {
         val originalRequest = chain.request()
         val requestBuilder = originalRequest.newBuilder()
         
+        requestBuilder.header("User-Agent", "TavunoTV/1.0 (Linux; Android TV)")
+        
         token?.let {
             requestBuilder.header("Authorization", "Bearer $it")
         }
