@@ -1,7 +1,7 @@
 package com.tavuno.tv.ui
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.rule.ActivityTestRule
+import androidx.test.ext.junit.rules.ActivityScenarioRule
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -9,7 +9,7 @@ import com.tavuno.tv.MainActivity
 
 /**
  * Instrumented smoke test for DVR functionality.
- * 
+ *
  * This test verifies the app launches successfully.
  * Full DVR testing requires a running backend with DVR enabled.
  */
@@ -17,7 +17,7 @@ import com.tavuno.tv.MainActivity
 class DvrRewindTest {
 
     @get:Rule
-    val activityRule = ActivityTestRule(MainActivity::class.java)
+    val activityRule = ActivityScenarioRule(MainActivity::class.java)
 
     @Test
     fun appLaunchesSuccessfully() {
