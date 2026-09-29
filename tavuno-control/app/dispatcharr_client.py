@@ -102,12 +102,23 @@ class DispatcharrClient:
         return redact_record(streams)
 
     def get_stream_by_id(self, stream_id: int) -> dict[str, Any] | None:
-        """Get a specific stream by ID from Dispatcharr."""
+        """Get a specific stream by ID from Dispatcharr (redacted)."""
         try:
             data = self._get_json(f"/api/channels/streams/{stream_id}/")
             return redact_record(data) if isinstance(data, dict) else None
         except Exception as exc:
             logger.warning("Could not fetch stream %s from Dispatcharr: %s", stream_id, exc)
+            return None
+
+    def get_stream_url_by_id(self, stream_id: int) -> str | None:
+        """Get the direct stream URL for a specific stream ID (unredacted)."""
+        try:
+            data = self._get_json(f"/api/channels/streams/{stream_id}/")
+            if isinstance(data, dict) and "url" in data:
+                return data["url"]
+            return None
+        except Exception as exc:
+            logger.warning("Could not fetch stream URL for %s from Dispatcharr: %s", stream_id, exc)
             return None
 
     def get_all_streams(self, max_pages: int = 50) -> list[dict[str, Any]]:

@@ -271,9 +271,8 @@ def authorize_live_playback(
                 )
                 stream_id = _int(source["external_id"])
                 if stream_id:
-                    stream_data = dispatcharr.get_stream_by_id(stream_id)
-                    if stream_data and stream_data.get("url"):
-                        direct_hls_url = stream_data["url"]
+                    direct_hls_url = dispatcharr.get_stream_url_by_id(stream_id)
+                    if direct_hls_url:
                         playback_mode = "direct_hls"
                         logger.info("Using direct HLS playback for channel %s from Dispatcharr stream %s", channel_id, stream_id)
             except Exception as exc:
