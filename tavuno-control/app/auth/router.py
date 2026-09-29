@@ -68,7 +68,7 @@ def login(
     except ValueError as e:
         # Return 403 for device limit errors, 401 for credentials errors, 402 for subscription required
         error_msg = str(e).lower()
-        if "device_limit_reached" in error_msg or "device_revoked" in error_msg:
+        if "device_limit_reached" in error_msg or "device_revoked" in error_msg or "device_already_registered" in error_msg:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=str(e)

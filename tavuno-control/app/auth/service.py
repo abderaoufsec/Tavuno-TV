@@ -6,6 +6,8 @@ import time
 import hashlib
 import re
 
+from psycopg.errors import UniqueViolation
+
 from app.services import Services
 from app.auth.password import hash_password, verify_password
 from app.auth.tokens import create_access_token, create_refresh_token, verify_token
@@ -337,32 +339,63 @@ class AuthService:
             if not verify_password(password, profile['password_hash']):
                 raise ValueError("Invalid credentials")
 
-            # Check or register device
+            # Check or register device. Fingerprint/device_key are globally unique,
+            # so look up the TV emulator across profiles instead of inserting a duplicate.
             device = conn.execute(
                 """
                 SELECT id, profile, name, device_key, platform, is_active, revoked_at
                 FROM tavuno_devices
-                WHERE device_fingerprint = %s AND profile = %s
+                WHERE device_fingerprint = %s OR device_key = %s
+                ORDER BY CASE WHEN profile = %s THEN 0 ELSE 1 END, id ASC
+                LIMIT 1
                 """,
-                (device_fingerprint, profile['id']),
+                (device_fingerprint, device_fingerprint, profile['id']),
             ).fetchone()
 
             device_id = None
             if device:
                 if device['revoked_at']:
                     raise ValueError("Device has been revoked")
-                # If device is inactive (e.g., after logout), reactivate it
-                if not device['is_active']:
-                    conn.execute(
-                        "UPDATE tavuno_devices SET is_active = TRUE, last_seen_at = NOW() WHERE id = %s",
-                        (device['id'],)
-                    )
-                else:
-                    # Update last_seen_at for active devices
-                    conn.execute(
-                        "UPDATE tavuno_devices SET last_seen_at = NOW() WHERE id = %s",
-                        (device['id'],)
-                    )
+
+                if device['profile'] != profile['id']:
+                    subscription = conn.execute(
+                        """
+                        SELECT s.id, p.max_devices
+                        FROM tavuno_subscriptions s
+                        JOIN tavuno_plans p ON s.plan = p.id
+                        WHERE s.profile = %s AND s.status = 'active'
+                          AND (s.ends_at IS NULL OR s.ends_at > NOW())
+                        ORDER BY s.ends_at DESC
+                        LIMIT 1
+                        """,
+                        (profile['id'],),
+                    ).fetchone()
+                    if not subscription:
+                        raise ValueError("subscription_required")
+                    max_devices = subscription['max_devices'] or 2
+                    active_count = conn.execute(
+                        """
+                        SELECT COUNT(*) as count
+                        FROM tavuno_devices
+                        WHERE profile = %s AND revoked_at IS NULL
+                        """,
+                        (profile['id'],),
+                    ).fetchone()['count']
+                    if active_count >= max_devices:
+                        raise ValueError("device_limit_reached")
+
+                conn.execute(
+                    """
+                    UPDATE tavuno_devices
+                    SET profile = %s,
+                        platform = %s,
+                        device_fingerprint = %s,
+                        is_active = TRUE,
+                        last_seen_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (profile['id'], platform, device_fingerprint, device['id']),
+                )
                 device_id = device['id']
             else:
                 # New device - check device limit
@@ -400,14 +433,18 @@ class AuthService:
                     raise ValueError("device_limit_reached")
                 
                 # Create new device
-                result = conn.execute(
-                    """
-                    INSERT INTO tavuno_devices (profile, name, device_key, device_fingerprint, platform, is_active, last_seen_at)
-                    VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
-                    RETURNING id
-                    """,
-                    (profile['id'], f"{platform} device", device_fingerprint, device_fingerprint, platform),
-                ).fetchone()
+                try:
+                    result = conn.execute(
+                        """
+                        INSERT INTO tavuno_devices (profile, name, device_key, device_fingerprint, platform, is_active, last_seen_at)
+                        VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
+                        RETURNING id
+                        """,
+                        (profile['id'], f"{platform} device", device_fingerprint, device_fingerprint, platform),
+                    ).fetchone()
+                except UniqueViolation as exc:
+                    conn.rollback()
+                    raise ValueError("device_already_registered") from exc
                 device_id = result['id']
 
             conn.commit()

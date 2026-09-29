@@ -12,9 +12,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
-import com.tavuno.tv.data.local.SessionManager
 import com.tavuno.tv.ui.theme.TavunoAccent
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
+import com.tavuno.tv.network.NetworkModule
 
 @Composable
 fun SplashScreen(
@@ -23,20 +24,10 @@ fun SplashScreen(
     onNavigateToHome: () -> Unit
 ) {
     LaunchedEffect(Unit) {
-        delay(1000) // Show splash for 1 second
-        
-        // Check if user is authenticated
-        var isAuthenticated = false
-        try {
-            sessionManager.isAuthenticated.collect { authenticated ->
-                isAuthenticated = authenticated
-                throw kotlinx.coroutines.CancellationException()
-            }
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            // Expected
-        }
-        
-        if (isAuthenticated) {
+        delay(400)
+        val token = sessionManager.accessToken.first()
+        NetworkModule.updateAuthToken(token)
+        if (token != null) {
             onNavigateToHome()
         } else {
             onNavigateToLogin()

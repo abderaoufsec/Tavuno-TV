@@ -26,7 +26,7 @@ object AppModule {
     }
     
     val catalogRepository: CatalogRepository by lazy {
-        CatalogRepository(NetworkModule.apiService)
+        CatalogRepository(NetworkModule.apiService, sessionManager)
     }
     
     val sportsRepository: SportsRepository by lazy {
