@@ -20,7 +20,7 @@ import com.tavuno.tv.ui.theme.TavunoTheme
  *  3. [ContentPane] — the rounded content panel that owns [TavunoColors.contentPanelFill].
  *  4. [TavunoTopBar] — the title strip above it.
  *
- * Only the shell's six top-level destinations render inside this; detail and player routes are
+ * Only the shell's seven top-level destinations render inside this; detail and player routes are
  * pushed full-screen so the video and detail art get the whole display.
  *
  * @param requestSidebarFocus request initial D-pad focus for the selected rail item. Pass true only

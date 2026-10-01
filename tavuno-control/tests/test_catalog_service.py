@@ -1092,3 +1092,193 @@ class TestGetMatchDetails:
             match_details = catalog_service.get_match_details(999)
 
         assert match_details is None
+
+
+class TestLiveChannelTestScope:
+    """Test the reversible live-channel test scope (TAVUNO_LIVE_CHANNEL_*)."""
+
+    def test_default_scope_is_unrestricted(self, catalog_service):
+        """Without configuration the whole synced catalog is exposed."""
+        # mock_services is a Mock, so settings.live_channel_* are Mocks too: the
+        # scope helpers must coerce them to "no restriction" rather than crash.
+        assert catalog_service._live_channel_scope() == ("", [])
+        assert catalog_service._live_channel_limit() == 0
+
+    def test_allowlist_of_ids_builds_any_clause(self, catalog_service):
+        catalog_service.services.settings.live_channel_allowlist = "8845, 6860,6869"
+        catalog_service.services.settings.live_channel_limit = 3
+
+        clause, params = catalog_service._live_channel_scope()
+
+        assert clause == " AND (id = ANY(%s))"
+        assert params == [[8845, 6860, 6869]]
+        assert catalog_service._live_channel_limit() == 3
+
+    def test_allowlist_accepts_slugs_too(self, catalog_service):
+        catalog_service.services.settings.live_channel_allowlist = "10-sydney, 24h"
+
+        clause, params = catalog_service._live_channel_scope()
+
+        assert clause == " AND (slug = ANY(%s))"
+        assert params == [["10-sydney", "24h"]]
+
+    def test_blank_allowlist_and_zero_limit_is_unrestricted(self, catalog_service):
+        catalog_service.services.settings.live_channel_allowlist = "   "
+        catalog_service.services.settings.live_channel_limit = 0
+
+        assert catalog_service._live_channel_scope() == ("", [])
+        assert catalog_service._live_channel_limit() == 0
+
+    def test_get_channels_applies_scope_and_limit(self, catalog_service, mock_connection):
+        """The scope must reach the SQL so the app only lists the test set."""
+        catalog_service.services.settings.live_channel_allowlist = "8845,6860"
+        catalog_service.services.settings.live_channel_limit = 2
+        mock_connection.execute.return_value.fetchall.return_value = []
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            catalog_service.get_channels()
+
+        query, params = mock_connection.execute.call_args[0]
+        assert "id = ANY(%s)" in query
+        assert "LIMIT %s" in query
+        assert params == ([8845, 6860], 2)
+
+    def test_get_channels_keeps_category_filter_with_scope(self, catalog_service, mock_connection):
+        catalog_service.services.settings.live_channel_allowlist = "8845"
+        catalog_service.services.settings.live_channel_limit = 1
+        mock_connection.execute.return_value.fetchall.return_value = []
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            catalog_service.get_channels(category_id=5)
+
+        query, params = mock_connection.execute.call_args[0]
+        assert "category = %s" in query
+        assert "id = ANY(%s)" in query
+        assert params == (5, [8845], 1)
+
+    def test_get_channels_without_scope_is_unchanged(self, catalog_service, mock_connection):
+        """No scope configured -> the historic query/params shape is preserved."""
+        mock_connection.execute.return_value.fetchall.return_value = []
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            catalog_service.get_channels(category_id=5)
+
+        query, params = mock_connection.execute.call_args[0]
+        assert "id = ANY(%s)" not in query
+        assert "LIMIT %s" not in query
+        assert params == (5,)
+
+    def test_get_home_limit_doubles_as_rail_size(self, catalog_service, mock_connection):
+        """A 10-channel test scope must not advertise 12 featured channels."""
+        catalog_service.services.settings.live_channel_allowlist = "8845"
+        catalog_service.services.settings.live_channel_limit = 10
+        mock_connection.execute.return_value.fetchall.side_effect = [[], []]
+
+        with patch.object(catalog_service, '_db') as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            catalog_service.get_home()
+
+        channel_query, channel_params = mock_connection.execute.call_args_list[1][0]
+        assert "id = ANY(%s)" in channel_query
+        assert channel_params == ([8845], 10)
+
+
+class TestCatalogSearch:
+    """Search (Slice B): grouped, scoped, wildcard-safe."""
+
+    @staticmethod
+    def _run(catalog_service, mock_connection, query, **kwargs):
+        with patch.object(catalog_service, "_db") as mock_db:
+            mock_db.return_value.__enter__.return_value = mock_connection
+            return catalog_service.search(query, **kwargs)
+
+    def test_blank_query_short_circuits_without_touching_the_db(self, catalog_service):
+        mock_connection = MagicMock()
+
+        result = self._run(catalog_service, mock_connection, "   ")
+
+        assert result == {"query": "", "channels": [], "movies": [], "series": []}
+        mock_connection.execute.assert_not_called()
+
+    def test_search_queries_each_collection_with_ilike(self, catalog_service):
+        mock_connection = MagicMock()
+        mock_connection.execute.return_value.fetchall.return_value = []
+
+        result = self._run(catalog_service, mock_connection, "news", limit=10)
+
+        assert result["query"] == "news"
+        assert mock_connection.execute.call_count == 3
+        channel_query, channel_params = mock_connection.execute.call_args_list[0][0]
+        assert "name ILIKE %s" in channel_query
+        assert channel_query.endswith("ORDER BY name LIMIT %s")
+        assert channel_params == ("%news%", 10)
+        movie_query, movie_params = mock_connection.execute.call_args_list[1][0]
+        assert "title ILIKE %s" in movie_query
+        assert movie_params == ("%news%", 10)
+        series_query, _ = mock_connection.execute.call_args_list[2][0]
+        assert "title ILIKE %s" in series_query
+
+    def test_search_is_case_insensitive_and_matches_infixes(self, catalog_service):
+        mock_connection = MagicMock()
+        mock_connection.execute.return_value.fetchall.return_value = []
+
+        self._run(catalog_service, mock_connection, "NeWs")
+
+        _, params = mock_connection.execute.call_args_list[0][0]
+        # ILIKE supplies the case folding; the pattern is a plain infix match.
+        assert params[0] == "%NeWs%"
+
+    def test_search_escapes_like_wildcards(self, catalog_service):
+        mock_connection = MagicMock()
+        mock_connection.execute.return_value.fetchall.return_value = []
+
+        self._run(catalog_service, mock_connection, "100% ")
+
+        _, params = mock_connection.execute.call_args_list[0][0]
+        assert params[0] == "%100\\%%"
+
+    def test_search_applies_live_channel_scope_and_scope_limit(self, catalog_service):
+        catalog_service.services.settings.live_channel_allowlist = "8845,6860"
+        catalog_service.services.settings.live_channel_limit = 2
+        mock_connection = MagicMock()
+        mock_connection.execute.return_value.fetchall.return_value = []
+
+        self._run(catalog_service, mock_connection, "news", limit=20)
+
+        channel_query, channel_params = mock_connection.execute.call_args_list[0][0]
+        assert "id = ANY(%s)" in channel_query
+        # pattern, allowlist ids, then the cap — clamped by the test-scope limit.
+        assert channel_params == ("%news%", [8845, 6860], 2)
+
+    def test_search_limit_is_clamped(self, catalog_service):
+        mock_connection = MagicMock()
+        mock_connection.execute.return_value.fetchall.return_value = []
+
+        self._run(catalog_service, mock_connection, "a", limit=500)
+
+        for call in mock_connection.execute.call_args_list:
+            assert call[0][1][-1] == 50
+
+    def test_search_maps_rows_to_models(self, catalog_service):
+        channel_row = {"id": 1, "name": "News 24", "slug": "news-24", "category": 5,
+                       "logo": None, "is_active": True}
+        movie_row = {"id": 2, "title": "Newsroom", "slug": "newsroom", "category": None,
+                     "synopsis": None, "release_year": 2020, "is_active": True}
+        series_row = {"id": 3, "title": "Newsroom Tonight", "slug": "newsroom-tonight",
+                      "category": None, "synopsis": None, "is_active": True}
+        mock_connection = MagicMock()
+        mock_connection.execute.return_value.fetchall.side_effect = [
+            [channel_row], [movie_row], [series_row],
+        ]
+
+        result = self._run(catalog_service, mock_connection, "news")
+
+        assert isinstance(result["channels"][0], Channel)
+        assert isinstance(result["movies"][0], Movie)
+        assert isinstance(result["series"][0], Series)
+        assert result["channels"][0].name == "News 24"
+        assert result["movies"][0].title == "Newsroom"
+        assert result["series"][0].title == "Newsroom Tonight"

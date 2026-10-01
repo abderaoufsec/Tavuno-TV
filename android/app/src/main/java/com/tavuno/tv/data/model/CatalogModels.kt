@@ -91,6 +91,17 @@ data class Series(
     val poster: String? = null
 )
 
+/**
+ * Grouped payload for `GET /v1/search` (Slice B): one query, three collections. Every group is
+ * always present (possibly empty) so the search UI can render sections without null checks.
+ */
+data class SearchResults(
+    val query: String,
+    val channels: List<Channel>,
+    val movies: List<Movie>,
+    val series: List<Series>
+)
+
 data class SeriesDetails(
     val id: Int,
     val title: String,

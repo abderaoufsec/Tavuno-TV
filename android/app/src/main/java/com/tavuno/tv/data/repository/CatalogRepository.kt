@@ -96,6 +96,26 @@ class CatalogRepository(
         }
     }
 
+    /**
+     * Search channels, movies and series in one round trip (`GET /v1/search`).
+     *
+     * The backend trims, wildcard-escapes and live-channel-scopes the term; the app simply debounces
+     * typing and renders the three groups.
+     */
+    suspend fun search(query: String, limit: Int? = null): Result<SearchResults> {
+        return try {
+            ensureAuthToken()
+            val response = apiService.search(query, limit)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception(catalogError(response.code(), "search results")))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getMovies(categoryId: Int? = null): Result<List<Movie>> {
         return try {
             ensureAuthToken()

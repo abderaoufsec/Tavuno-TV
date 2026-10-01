@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Tv
@@ -20,5 +21,6 @@ enum class TavunoTab(val label: String, val icon: ImageVector) {
     SPORTS("Sports", Icons.Filled.SportsSoccer),
     MOVIES("Movies", Icons.Filled.Movie),
     SERIES("Series", Icons.Filled.Tv),
+    SEARCH("Search", Icons.Filled.Search),
     SETTINGS("Settings", Icons.Filled.Settings),
 }

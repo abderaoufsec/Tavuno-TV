@@ -115,6 +115,23 @@ The following authentication/authorization defects identified before M9 were rem
 - New unit test: EpgTimeFormatTest; `gradlew test assembleDebug` BUILD SUCCESSFUL (0 errors)
 - Remaining (tracked as follow-up stages): LiveTv, Sports, MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login still on legacy layout/FocusableCard; FocusableCard retirement gate
 
+### Playback Guest-Mode Fix + Live Test Scope ✅ COMPLETE (2026-10-01)
+**Symptom:** opening any stream showed *"No access token available"* and the player never started.
+
+**Root causes (two, both Android-side):**
+1. `PlaybackRepository.getAccessToken()` threw when no token existed, but splash had already been changed to skip login (free launch / `AUTH_OPEN_ACCESS`). Every playback authorization therefore failed before it reached the network.
+2. `PlayerScreen` drove ExoPlayer from `CoroutineScope(Dispatchers.IO)`, so as soon as playback *was* authorized it died with `IllegalStateException: Player is accessed on the wrong thread` (`FATAL EXCEPTION: DefaultDispatcher-worker-1`).
+
+**Fixes:**
+- Authorization headers are now nullable end-to-end (`TavunoApiService` `@Header` params, `ApiAuthorization.bearerAuthorization()`); a guest sends no header and the backend resolves its seeded identity instead of the app throwing.
+- `PlayerScreen` performs authorization in a `LaunchedEffect` (main dispatcher) with a composition `rememberCoroutineScope()` for heartbeats, so ExoPlayer is only ever touched on the thread that created it.
+- Heartbeats no longer stack on repeated `ON_RESUME`.
+
+**Verified on the Android TV emulator:** `POST /v1/playback/live/8845` → `200 OK` with no `Authorization` header; ExoPlayer decoded H.264 video + audio; playback session `129` recorded `active` for `guest@tavuno.local`; zero FATALs.
+
+**Live channel test scope (reversible):** new `TAVUNO_LIVE_CHANNEL_ALLOWLIST` / `TAVUNO_LIVE_CHANNEL_LIMIT` settings filter `/v1/channels` and `/v1/home` at read time (synced data untouched). `tavuno-control/scripts/find_working_channels.py` finds channels whose upstream really plays (playback answers `protocol: "http_hls"`) and writes the scope into `tavuno-infra/.env`. Currently scoped to **10 verified-working channels**; clear with `--clear` to restore all 2036. See `docs/Live_Channel_Test_Scope.md`.
+
+**Tests:** `TestLiveChannelTestScope` (8 cases) in `tests/test_catalog_service.py` (53 passed); `AuthorizationHeadersTest` on Android. Backend suite: 219 passed / 9 skipped with `AUTH_OPEN_ACCESS=false`.
 ## Incomplete Milestones
 
 ### M13 — Catch-up / DVR / Timeshift ⚠️ PARTIAL

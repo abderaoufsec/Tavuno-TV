@@ -39,6 +39,63 @@ class CatalogService:
         with self.services.connection() as connection:
             yield connection
 
+    # --- Live-channel test scope ------------------------------------------
+    # Free-launch testing needs a handful of verified-working channels instead
+    # of the full synced catalog. These helpers translate the settings into an
+    # additive SQL filter so the underlying data is never mutated and lifting
+    # the test scope is a config change (empty allowlist + limit 0 = no filter).
+
+    @staticmethod
+    def _scope_text(value: Any) -> str:
+        """Coerce a settings value to text; non-strings (e.g. test doubles) -> ""."""
+        return value.strip() if isinstance(value, str) else ""
+
+    @staticmethod
+    def _scope_int(value: Any) -> int:
+        """Coerce a settings value to int; anything unusable -> 0."""
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    def _live_channel_scope(self) -> tuple:
+        """Return an extra WHERE fragment + params restricting live channels.
+
+        The allowlist accepts numeric channel IDs and/or slugs, comma separated.
+        Returns ``("", [])`` when no allowlist is configured.
+        """
+        settings = getattr(self.services, "settings", None)
+        allowlist = self._scope_text(getattr(settings, "live_channel_allowlist", ""))
+        if not allowlist:
+            return "", []
+
+        ids: List[int] = []
+        slugs: List[str] = []
+        for token in (part.strip() for part in allowlist.split(",")):
+            if not token:
+                continue
+            if token.lstrip("+-").isdigit():
+                ids.append(int(token))
+            else:
+                slugs.append(token)
+
+        clauses: List[str] = []
+        params: List[Any] = []
+        if ids:
+            clauses.append("id = ANY(%s)")
+            params.append(ids)
+        if slugs:
+            clauses.append("slug = ANY(%s)")
+            params.append(slugs)
+        if not clauses:
+            return "", []
+        return " AND (" + " OR ".join(clauses) + ")", params
+
+    def _live_channel_limit(self) -> int:
+        """Cap on how many live channels are listed; 0 means unlimited."""
+        settings = getattr(self.services, "settings", None)
+        return max(0, self._scope_int(getattr(settings, "live_channel_limit", 0)))
+
     def _map_channel(self, row: dict) -> Channel:
         """Map database row to Channel model.
         
@@ -187,17 +244,25 @@ class CatalogService:
         Returns:
             List of Channel models
         """
+        scope_clause, scope_params = self._live_channel_scope()
         query = "SELECT id, name, slug, category, logo, is_active FROM tavuno_channels WHERE is_active = TRUE"
-        parameters: tuple = ()
-        
+        parameters: List[Any] = []
+
         if category_id is not None:
             query += " AND category = %s"
-            parameters = (category_id,)
-        
+            parameters.append(category_id)
+
+        query += scope_clause
+        parameters.extend(scope_params)
         query += " ORDER BY name"
-        
+
+        limit = self._live_channel_limit()
+        if limit:
+            query += " LIMIT %s"
+            parameters.append(limit)
+
         with self._db() as conn:
-            rows = conn.execute(query, parameters).fetchall()
+            rows = conn.execute(query, tuple(parameters)).fetchall()
         
         return [self._map_channel(row) for row in rows]
 
@@ -350,6 +415,65 @@ class CatalogService:
         
         return self._map_series(row)
 
+    # --- Search (Slice B: OwnTV parity) ---------------------------------
+
+    @staticmethod
+    def _escape_like(query: str) -> str:
+        """Escape LIKE/ILIKE wildcards: a query of '%' must not match everything."""
+        return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    def search(self, query: str, limit: int = 20) -> Dict[str, Any]:
+        """Case-insensitive name/title search across channels, movies and series.
+
+        Live channels are filtered through the same test-scope allowlist (and cap)
+        as :meth:`get_channels`, so search can never reveal a channel the app is
+        not allowed to list.
+
+        Args:
+            query: Raw user query; trimmed before use. Empty -> empty result groups.
+            limit: Per-collection cap, clamped to 1..50.
+
+        Returns:
+            ``{"query": str, "channels": [Channel], "movies": [Movie], "series": [Series]}``
+        """
+        term = query.strip() if isinstance(query, str) else ""
+        if not term:
+            return {"query": term, "channels": [], "movies": [], "series": []}
+
+        pattern = f"%{self._escape_like(term)}%"
+        cap = max(1, min(int(limit), 50))
+        scope_clause, scope_params = self._live_channel_scope()
+        live_limit = self._live_channel_limit()
+        channel_cap = min(cap, live_limit) if live_limit else cap
+
+        channel_query = (
+            "SELECT id, name, slug, category, logo, is_active FROM tavuno_channels "
+            "WHERE is_active = TRUE AND name ILIKE %s"
+            + scope_clause
+            + " ORDER BY name LIMIT %s"
+        )
+        channel_params: List[Any] = [pattern, *scope_params, channel_cap]
+        movie_query = (
+            "SELECT id, title, slug, category, synopsis, release_year, is_active FROM tavuno_movies "
+            "WHERE is_active = TRUE AND title ILIKE %s ORDER BY title LIMIT %s"
+        )
+        series_query = (
+            "SELECT id, title, slug, category, synopsis, is_active FROM tavuno_series "
+            "WHERE is_active = TRUE AND title ILIKE %s ORDER BY title LIMIT %s"
+        )
+
+        with self._db() as conn:
+            channel_rows = conn.execute(channel_query, tuple(channel_params)).fetchall()
+            movie_rows = conn.execute(movie_query, (pattern, cap)).fetchall()
+            series_rows = conn.execute(series_query, (pattern, cap)).fetchall()
+
+        return {
+            "query": term,
+            "channels": [self._map_channel(row) for row in channel_rows],
+            "movies": [self._map_movie(row) for row in movie_rows],
+            "series": [self._map_series(row) for row in series_rows],
+        }
+
     def get_home(self) -> dict:
         """Get home page data (categories and featured channels).
         
@@ -360,8 +484,15 @@ class CatalogService:
             categories = conn.execute(
                 "SELECT id, name, kind, parent, sort_order, is_active FROM tavuno_categories WHERE is_active = TRUE ORDER BY sort_order, name LIMIT 12"
             ).fetchall()
+            scope_clause, scope_params = self._live_channel_scope()
+            # The limit doubles as the rail size: a 10-channel test scope must
+            # not advertise 12 features.
+            channel_limit = self._live_channel_limit() or 12
             channels = conn.execute(
-                "SELECT id, name, slug, category, logo, is_active FROM tavuno_channels WHERE is_active = TRUE ORDER BY name LIMIT 12"
+                "SELECT id, name, slug, category, logo, is_active FROM tavuno_channels WHERE is_active = TRUE"
+                + scope_clause
+                + " ORDER BY name LIMIT %s",
+                tuple(scope_params) + (channel_limit,),
             ).fetchall()
         
         return {

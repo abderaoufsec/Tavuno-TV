@@ -10,6 +10,7 @@ import com.tavuno.tv.core.AppModule
 import com.tavuno.tv.ui.screens.home.HomeScreen
 import com.tavuno.tv.ui.screens.live.LiveTvScreen
 import com.tavuno.tv.ui.screens.movies.MoviesScreen
+import com.tavuno.tv.ui.screens.search.SearchScreen
 import com.tavuno.tv.ui.screens.series.SeriesScreen
 import com.tavuno.tv.ui.screens.settings.SettingsScreen
 import com.tavuno.tv.ui.screens.sports.SportsScreen
@@ -17,7 +18,7 @@ import com.tavuno.tv.ui.shell.TavunoShell
 import com.tavuno.tv.ui.shell.TavunoTab
 
 /**
- * The shell host: the six top-level destinations all render inside one persistent [TavunoShell],
+ * The shell host: the seven top-level destinations all render inside one persistent [TavunoShell],
  * switched by an internal tab state rather than by navigation.
  *
  * This is what makes the restyle behave like a real TV app — the sidebar keeps its focus and its
@@ -72,6 +73,13 @@ fun TavunoMainScreen(
 
             TavunoTab.SERIES -> SeriesScreen(
                 catalogRepository = AppModule.catalogRepository,
+                onNavigateToSeriesDetails = onNavigateToSeriesDetails,
+            )
+
+            TavunoTab.SEARCH -> SearchScreen(
+                catalogRepository = AppModule.catalogRepository,
+                onNavigateToPlayer = onNavigateToPlayer,
+                onNavigateToMovieDetails = onNavigateToMovieDetails,
                 onNavigateToSeriesDetails = onNavigateToSeriesDetails,
             )
 

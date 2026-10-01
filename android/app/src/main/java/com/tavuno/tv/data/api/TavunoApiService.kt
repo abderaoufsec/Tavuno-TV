@@ -19,11 +19,14 @@ interface TavunoApiService {
     @POST("v1/auth/logout")
     suspend fun logout(@Body request: LogoutRequest): Response<Unit>
     
+    // Authorization is nullable on every authenticated call: free-launch
+    // (AUTH_OPEN_ACCESS) runs without a token and the backend resolves the
+    // seeded guest identity. Retrofit omits a null @Header entirely.
     @GET("v1/auth/me")
-    suspend fun getMe(@Header("Authorization") authorization: String): Response<UserProfile>
+    suspend fun getMe(@Header("Authorization") authorization: String?): Response<UserProfile>
     
     @GET("v1/auth/subscription")
-    suspend fun getSubscription(@Header("Authorization") authorization: String): Response<Subscription>
+    suspend fun getSubscription(@Header("Authorization") authorization: String?): Response<Subscription>
     
     // Catalog
     @GET("v1/home")
@@ -40,6 +43,13 @@ interface TavunoApiService {
     
     @GET("v1/categories/{category_id}")
     suspend fun getCategory(@Path("category_id") categoryId: Int): Response<Category>
+
+    // Grouped search across channels, movies and series (Slice B).
+    @GET("v1/search")
+    suspend fun search(
+        @Query("q") query: String,
+        @Query("limit") limit: Int?
+    ): Response<SearchResults>
     
     @GET("v1/movies")
     suspend fun getMovies(@Query("category_id") categoryId: Int?): Response<List<Movie>>
@@ -90,19 +100,19 @@ interface TavunoApiService {
     @POST("v1/playback/live/{channel_id}")
     suspend fun authorizeLivePlayback(
         @Path("channel_id") channelId: Int,
-        @Header("Authorization") authorization: String
+        @Header("Authorization") authorization: String?
     ): Response<PlaybackAuthorization>
     
     @POST("v1/playback/movie/{movie_id}")
     suspend fun authorizeMoviePlayback(
         @Path("movie_id") movieId: Int,
-        @Header("Authorization") authorization: String
+        @Header("Authorization") authorization: String?
     ): Response<MoviePlaybackAuthorization>
     
     @POST("v1/playback/episode/{episode_id}")
     suspend fun authorizeEpisodePlayback(
         @Path("episode_id") episodeId: Int,
-        @Header("Authorization") authorization: String
+        @Header("Authorization") authorization: String?
     ): Response<EpisodePlaybackAuthorization>
     
     @POST("v1/playback/heartbeat")

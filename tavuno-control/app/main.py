@@ -219,6 +219,24 @@ def get_category(category_id: int, services: ServicesDependency, principal: dict
     return category.model_dump()
 
 
+@app.get("/v1/search", tags=["catalog"])
+def search_catalog(
+    services: ServicesDependency,
+    q: str,
+    limit: int = 20,
+    principal: dict = Depends(current_principal),
+) -> dict[str, Any]:
+    """Case-insensitive search across channels, movies and series (Slice B)."""
+    catalog = CatalogService(services)
+    results = catalog.search(q, limit=limit)
+    return {
+        "query": results["query"],
+        "channels": [item.model_dump() for item in results["channels"]],
+        "movies": [item.model_dump() for item in results["movies"]],
+        "series": [item.model_dump() for item in results["series"]],
+    }
+
+
 @app.get("/v1/movies", tags=["catalog"])
 def movies(services: ServicesDependency, category_id: int | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     catalog = CatalogService(services)
