@@ -196,43 +196,50 @@ def authorize_live_playback(
     device_id = device["id"]
     device_platform = device.get("platform") if isinstance(device, dict) else None
 
-    # 3. Subscription & entitlement check
-    sub = connection.execute(
-        """
-        SELECT s.id, p.max_concurrent_streams, p.max_devices
-        FROM tavuno_subscriptions s
-        JOIN tavuno_plans p ON p.id = s.plan
-        WHERE s.profile = %s AND s.status = 'active'
-          AND (s.ends_at IS NULL OR s.ends_at > NOW())
-        ORDER BY s.id DESC LIMIT 1
-        """,
-        (profile_id,),
-    ).fetchone()
+    # 3. Subscription & entitlement check (bypassed in open-access free launch)
+    if getattr(settings, "auth_open_access", False):
+        # AUTH_OPEN_ACCESS free launch: billing is deferred, so the shared
+        # guest identity has no subscription. Per-profile concurrency limits
+        # would also cap ALL anonymous viewers at once (they share one
+        # profile), so capacity is enforced at the infra layer instead.
+        sub = None
+    else:
+        sub = connection.execute(
+            """
+            SELECT s.id, p.max_concurrent_streams, p.max_devices
+            FROM tavuno_subscriptions s
+            JOIN tavuno_plans p ON p.id = s.plan
+            WHERE s.profile = %s AND s.status = 'active'
+              AND (s.ends_at IS NULL OR s.ends_at > NOW())
+            ORDER BY s.id DESC LIMIT 1
+            """,
+            (profile_id,),
+        ).fetchone()
 
-    if not sub:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Active subscription required for playback",
-        )
+        if not sub:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Active subscription required for playback",
+            )
 
-    max_concurrent = sub["max_concurrent_streams"]
-    max_devices = sub["max_devices"]
+        max_concurrent = sub["max_concurrent_streams"]
+        max_devices = sub["max_devices"]
 
-    # 4. Enforce concurrent stream limit
-    active_sessions = connection.execute(
-        """
-        SELECT COUNT(*) AS count
-        FROM tavuno_playback_sessions
-        WHERE profile = %s AND status = 'active' AND last_seen_at >= NOW() - INTERVAL '90 SECONDS'
-        """,
-        (profile_id,),
-    ).fetchone()
+        # 4. Enforce concurrent stream limit
+        active_sessions = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM tavuno_playback_sessions
+            WHERE profile = %s AND status = 'active' AND last_seen_at >= NOW() - INTERVAL '90 SECONDS'
+            """,
+            (profile_id,),
+        ).fetchone()
 
-    if active_sessions and active_sessions["count"] >= max_concurrent:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Concurrent playback stream limit reached ({max_concurrent} active streams)",
-        )
+        if active_sessions and active_sessions["count"] >= max_concurrent:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Concurrent playback stream limit reached ({max_concurrent} active streams)",
+            )
 
     # 5. Resolve channel
     channel = connection.execute(
@@ -243,22 +250,30 @@ def authorize_live_playback(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found or inactive")
 
     # 5.5. Entitlement check - verify profile has access to this channel
-    entitlement = connection.execute(
-        """
-        SELECT e.id FROM tavuno_entitlements e
-        JOIN tavuno_subscriptions s ON s.id = e.subscription
-        WHERE s.profile = %s AND s.status = 'active'
-          AND (s.ends_at IS NULL OR s.ends_at > NOW())
-          AND e.resource_type = 'channel' AND e.resource_key = %s AND e.is_active = TRUE
-        """,
-        (profile_id, str(channel_id)),
-    ).fetchone()
-    
-    if not entitlement:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Channel not included in subscription entitlements",
-        )
+    # Open-access free launch has no subscriptions to check. The wildcard
+    # branch also honours the 'all'/'*' rows seeded by FREE_LAUNCH
+    # registration, which the channel-only condition used to reject.
+    if not getattr(settings, "auth_open_access", False):
+        entitlement = connection.execute(
+            """
+            SELECT e.id FROM tavuno_entitlements e
+            JOIN tavuno_subscriptions s ON s.id = e.subscription
+            WHERE s.profile = %s AND s.status = 'active'
+              AND (s.ends_at IS NULL OR s.ends_at > NOW())
+              AND (
+                    (e.resource_type = 'all' AND e.resource_key = '*')
+                    OR (e.resource_type = 'channel' AND e.resource_key = %s)
+              )
+              AND e.is_active = TRUE
+            """,
+            (profile_id, str(channel_id)),
+        ).fetchone()
+
+        if not entitlement:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Channel not included in subscription entitlements",
+            )
 
     # Resolve stream sources (Dispatcharr stream IDs and/or OME mapping)
     source_rows = []
@@ -498,43 +513,50 @@ def authorize_movie_playback(
         )
     device_id = device["id"]
 
-    # 3. Subscription & entitlement check
-    sub = connection.execute(
-        """
-        SELECT s.id, p.max_concurrent_streams, p.max_devices
-        FROM tavuno_subscriptions s
-        JOIN tavuno_plans p ON p.id = s.plan
-        WHERE s.profile = %s AND s.status = 'active'
-          AND (s.ends_at IS NULL OR s.ends_at > NOW())
-        ORDER BY s.id DESC LIMIT 1
-        """,
-        (profile_id,),
-    ).fetchone()
+    # 3. Subscription & entitlement check (bypassed in open-access free launch)
+    if getattr(settings, "auth_open_access", False):
+        # AUTH_OPEN_ACCESS free launch: billing is deferred, so the shared
+        # guest identity has no subscription. Per-profile concurrency limits
+        # would also cap ALL anonymous viewers at once (they share one
+        # profile), so capacity is enforced at the infra layer instead.
+        sub = None
+    else:
+        sub = connection.execute(
+            """
+            SELECT s.id, p.max_concurrent_streams, p.max_devices
+            FROM tavuno_subscriptions s
+            JOIN tavuno_plans p ON p.id = s.plan
+            WHERE s.profile = %s AND s.status = 'active'
+              AND (s.ends_at IS NULL OR s.ends_at > NOW())
+            ORDER BY s.id DESC LIMIT 1
+            """,
+            (profile_id,),
+        ).fetchone()
 
-    if not sub:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Active subscription required for playback",
-        )
+        if not sub:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Active subscription required for playback",
+            )
 
-    max_concurrent = sub["max_concurrent_streams"]
-    max_devices = sub["max_devices"]
+        max_concurrent = sub["max_concurrent_streams"]
+        max_devices = sub["max_devices"]
 
-    # 4. Enforce concurrent stream limit
-    active_sessions = connection.execute(
-        """
-        SELECT COUNT(*) AS count
-        FROM tavuno_playback_sessions
-        WHERE profile = %s AND status = 'active' AND last_seen_at >= NOW() - INTERVAL '90 SECONDS'
-        """,
-        (profile_id,),
-    ).fetchone()
+        # 4. Enforce concurrent stream limit
+        active_sessions = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM tavuno_playback_sessions
+            WHERE profile = %s AND status = 'active' AND last_seen_at >= NOW() - INTERVAL '90 SECONDS'
+            """,
+            (profile_id,),
+        ).fetchone()
 
-    if active_sessions and active_sessions["count"] >= max_concurrent:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Concurrent playback stream limit reached ({max_concurrent} active streams)",
-        )
+        if active_sessions and active_sessions["count"] >= max_concurrent:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Concurrent playback stream limit reached ({max_concurrent} active streams)",
+            )
 
     # 5. Resolve movie
     movie = connection.execute(
@@ -635,43 +657,50 @@ def authorize_episode_playback(
         )
     device_id = device["id"]
 
-    # 3. Subscription & entitlement check
-    sub = connection.execute(
-        """
-        SELECT s.id, p.max_concurrent_streams, p.max_devices
-        FROM tavuno_subscriptions s
-        JOIN tavuno_plans p ON p.id = s.plan
-        WHERE s.profile = %s AND s.status = 'active'
-          AND (s.ends_at IS NULL OR s.ends_at > NOW())
-        ORDER BY s.id DESC LIMIT 1
-        """,
-        (profile_id,),
-    ).fetchone()
+    # 3. Subscription & entitlement check (bypassed in open-access free launch)
+    if getattr(settings, "auth_open_access", False):
+        # AUTH_OPEN_ACCESS free launch: billing is deferred, so the shared
+        # guest identity has no subscription. Per-profile concurrency limits
+        # would also cap ALL anonymous viewers at once (they share one
+        # profile), so capacity is enforced at the infra layer instead.
+        sub = None
+    else:
+        sub = connection.execute(
+            """
+            SELECT s.id, p.max_concurrent_streams, p.max_devices
+            FROM tavuno_subscriptions s
+            JOIN tavuno_plans p ON p.id = s.plan
+            WHERE s.profile = %s AND s.status = 'active'
+              AND (s.ends_at IS NULL OR s.ends_at > NOW())
+            ORDER BY s.id DESC LIMIT 1
+            """,
+            (profile_id,),
+        ).fetchone()
 
-    if not sub:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Active subscription required for playback",
-        )
+        if not sub:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Active subscription required for playback",
+            )
 
-    max_concurrent = sub["max_concurrent_streams"]
-    max_devices = sub["max_devices"]
+        max_concurrent = sub["max_concurrent_streams"]
+        max_devices = sub["max_devices"]
 
-    # 4. Enforce concurrent stream limit
-    active_sessions = connection.execute(
-        """
-        SELECT COUNT(*) AS count
-        FROM tavuno_playback_sessions
-        WHERE profile = %s AND status = 'active' AND last_seen_at >= NOW() - INTERVAL '90 SECONDS'
-        """,
-        (profile_id,),
-    ).fetchone()
+        # 4. Enforce concurrent stream limit
+        active_sessions = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM tavuno_playback_sessions
+            WHERE profile = %s AND status = 'active' AND last_seen_at >= NOW() - INTERVAL '90 SECONDS'
+            """,
+            (profile_id,),
+        ).fetchone()
 
-    if active_sessions and active_sessions["count"] >= max_concurrent:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Concurrent playback stream limit reached ({max_concurrent} active streams)",
-        )
+        if active_sessions and active_sessions["count"] >= max_concurrent:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Concurrent playback stream limit reached ({max_concurrent} active streams)",
+            )
 
     # 5. Resolve episode
     episode = connection.execute(

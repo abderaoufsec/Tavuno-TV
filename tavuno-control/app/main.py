@@ -10,10 +10,10 @@ from pydantic import BaseModel, Field
 
 from .config import get_settings
 from .playback import authorize_live_playback, authorize_movie_playback, authorize_episode_playback, heartbeat_session, stop_session, generate_auth_token, verify_playback_token
+from .playback_identity import resolve_playback_identity
 from .services import Services
 from .auth.router import router as auth_router
 from .devices.router import router as devices_router
-from .auth.service import AuthService
 from .auth.deps import current_principal, require_admin
 from .catalog.service import CatalogService
 from .session_reaper import reap_expired_sessions
@@ -394,33 +394,14 @@ def playback_live(
     services: ServicesDependency,
     authorization: str | None = Header(None),
 ) -> dict[str, Any]:
-    """Authorize a live playback stream with JWT authentication (M7)."""
-    if not authorization:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
-    
-    # Extract Bearer token
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
-    token = authorization.replace("Bearer ", "")
-    
+    """Authorize a live playback stream with JWT authentication (M7).
+
+    With AUTH_OPEN_ACCESS enabled the seeded guest identity is used when no
+    valid Bearer token is supplied (free launch, no login required).
+    """
     try:
-        # Use AuthService to verify token and get profile
-        auth_service = AuthService(services)
-        auth_data = auth_service.get_profile_from_token(token)
-        profile_id = auth_data["profile_id"]
-        device_id = auth_data["device_id"]
-
-        # Get device_key from database
+        profile_id, device_key = resolve_playback_identity(None, services, authorization)
         with database(services) as connection:
-            device = connection.execute(
-                "SELECT device_key FROM tavuno_devices WHERE id = %s AND profile = %s",
-                (device_id, profile_id),
-            ).fetchone()
-            if not device:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
-
-            device_key = device["device_key"]
-
             return authorize_live_playback(
                 profile_id=profile_id,
                 device_key=device_key,
@@ -493,33 +474,14 @@ def playback_movie(
     services: ServicesDependency,
     authorization: str | None = Header(None),
 ) -> dict[str, Any]:
-    """Authorize a movie playback stream with JWT authentication (M12)."""
-    if not authorization:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
-    
-    # Extract Bearer token
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
-    token = authorization.replace("Bearer ", "")
-    
+    """Authorize a movie playback stream with JWT authentication (M12).
+
+    With AUTH_OPEN_ACCESS enabled the seeded guest identity is used when no
+    valid Bearer token is supplied (free launch, no login required).
+    """
     try:
-        # Use AuthService to verify token and get profile
-        auth_service = AuthService(services)
-        auth_data = auth_service.get_profile_from_token(token)
-        profile_id = auth_data["profile_id"]
-        device_id = auth_data["device_id"]
-
-        # Get device_key from database
+        profile_id, device_key = resolve_playback_identity(None, services, authorization)
         with database(services) as connection:
-            device = connection.execute(
-                "SELECT device_key FROM tavuno_devices WHERE id = %s AND profile = %s",
-                (device_id, profile_id),
-            ).fetchone()
-            if not device:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
-
-            device_key = device["device_key"]
-
             return authorize_movie_playback(
                 profile_id=profile_id,
                 device_key=device_key,
@@ -543,33 +505,14 @@ def playback_episode(
     services: ServicesDependency,
     authorization: str | None = Header(None),
 ) -> dict[str, Any]:
-    """Authorize an episode playback stream with JWT authentication (M12)."""
-    if not authorization:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required")
-    
-    # Extract Bearer token
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
-    token = authorization.replace("Bearer ", "")
-    
+    """Authorize an episode playback stream with JWT authentication (M12).
+
+    With AUTH_OPEN_ACCESS enabled the seeded guest identity is used when no
+    valid Bearer token is supplied (free launch, no login required).
+    """
     try:
-        # Use AuthService to verify token and get profile
-        auth_service = AuthService(services)
-        auth_data = auth_service.get_profile_from_token(token)
-        profile_id = auth_data["profile_id"]
-        device_id = auth_data["device_id"]
-
-        # Get device_key from database
+        profile_id, device_key = resolve_playback_identity(None, services, authorization)
         with database(services) as connection:
-            device = connection.execute(
-                "SELECT device_key FROM tavuno_devices WHERE id = %s AND profile = %s",
-                (device_id, profile_id),
-            ).fetchone()
-            if not device:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
-
-            device_key = device["device_key"]
-
             return authorize_episode_playback(
                 profile_id=profile_id,
                 device_key=device_key,

@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     free_launch: bool = Field(default=True, validation_alias="FREE_LAUNCH")
     default_plan_id: int | None = Field(default=None, validation_alias="DEFAULT_PLAN_ID")
 
+    auth_open_access: bool = Field(default=False, validation_alias="AUTH_OPEN_ACCESS")
+    auth_guest_email: str = Field(default="guest@tavuno.local", validation_alias="AUTH_GUEST_EMAIL")
+    auth_guest_device_key: str = Field(default="tavuno-tv-guest", validation_alias="AUTH_GUEST_DEVICE_KEY")
+
     # Email service (M8.5)
     email_enabled: bool = Field(default=False, validation_alias="EMAIL_ENABLED")
     email_from_address: str = Field(default="noreply@tavuno.com", validation_alias="EMAIL_FROM_ADDRESS")

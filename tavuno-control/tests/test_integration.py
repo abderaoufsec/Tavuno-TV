@@ -17,6 +17,20 @@ def api_base():
 
 
 @pytest.fixture(scope="module")
+def open_access(api_base: str) -> bool:
+    """Detect whether the running API is in AUTH_OPEN_ACCESS free-launch mode.
+
+    An unauthenticated catalog request returns 200 in open-access mode and
+    401 in strict auth mode.
+    """
+    try:
+        response = httpx.get(f"{api_base}/v1/channels", timeout=5)
+    except httpx.HTTPError:
+        return False
+    return response.status_code == 200
+
+
+@pytest.fixture(scope="module")
 def caddy_base():
     """Base URL for Caddy reverse proxy."""
     return "http://localhost:8080"
@@ -121,25 +135,38 @@ class TestPlaybackAuthorization:
             assert "playback" in data
             assert "url" in data["playback"]
 
-    def test_playback_without_token(self, api_base: str):
-        """Test playback request without JWT token should fail."""
+    def test_playback_without_token(self, api_base: str, open_access: bool):
+        """Test playback request without JWT token.
+
+        Strict mode must reject with 401. Open-access mode resolves the
+        seeded guest identity instead, so auth itself must not reject.
+        """
         response = httpx.post(
             f"{api_base}/v1/playback/live/2",
             json={"channel_id": 2},
             timeout=5,
         )
-        # Should return 401 when auth header is missing
-        assert response.status_code == 401
+        if open_access:
+            assert response.status_code != 401
+        else:
+            assert response.status_code == 401
 
-    def test_playback_with_invalid_token(self, api_base: str):
-        """Test playback request with invalid JWT token should fail."""
+    def test_playback_with_invalid_token(self, api_base: str, open_access: bool):
+        """Test playback request with invalid JWT token.
+
+        Strict mode must reject with 401. Open-access mode tolerates stale
+        tokens and degrades to the guest identity.
+        """
         response = httpx.post(
             f"{api_base}/v1/playback/live/2",
             json={"channel_id": 2},
             headers={"Authorization": "Bearer invalid-token"},
             timeout=5,
         )
-        assert response.status_code == 401
+        if open_access:
+            assert response.status_code != 401
+        else:
+            assert response.status_code == 401
 
     def test_heartbeat(self, api_base: str, auth_token: str):
         """Test session heartbeat."""
@@ -252,14 +279,21 @@ class TestDispatcharr:
         except httpx.ConnectError:
             pytest.skip("Dispatcharr not accessible from test environment")
 
-    def test_dispatcharr_sync_admin_protected(self, api_base: str):
-        """Test admin sync endpoint requires authentication."""
+    def test_dispatcharr_sync_admin_protected(self, api_base: str, open_access: bool):
+        """Test admin sync endpoint requires elevated access.
+
+        Strict mode rejects anonymous callers with 401. Open-access mode
+        resolves them to the guest identity (role=user), which must still be
+        denied by the admin role check with 403.
+        """
         response = httpx.post(
             f"{api_base}/v1/admin/sync/dispatcharr",
             timeout=5,
         )
-        # Should return 401 when auth header is missing
-        assert response.status_code == 401
+        if open_access:
+            assert response.status_code == 403
+        else:
+            assert response.status_code == 401
 
     def test_dispatcharr_sync_with_auth(self, api_base: str):
         """Test admin sync with authentication."""
