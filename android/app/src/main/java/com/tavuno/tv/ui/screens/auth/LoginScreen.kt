@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +30,6 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import com.tavuno.tv.ui.theme.TavunoAccent
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
@@ -45,6 +44,7 @@ fun LoginScreen(
     
     val emailFocusRequester = remember { FocusRequester() }
     val passwordFocusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
     
     Column(
         modifier = Modifier
@@ -112,7 +112,7 @@ fun LoginScreen(
                 if (email.isNotBlank() && password.isNotBlank()) {
                     isLoading = true
                     errorMessage = null
-                    CoroutineScope(Dispatchers.IO).launch {
+                    scope.launch {
                         val result = authRepository.login(email, password)
                         result.fold(
                             onSuccess = {

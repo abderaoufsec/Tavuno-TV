@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,9 @@ fun SeasonEpisodesScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var episodes by remember { mutableStateOf<List<EpisodeDetails>>(emptyList())}
+    // Playback authorization ends in a navigation callback, which must be
+    // invoked on the main thread.
+    val scope = rememberCoroutineScope()
     
     // Load episodes from repository
     CoroutineScope(Dispatchers.IO).launch {
@@ -115,7 +119,7 @@ fun SeasonEpisodesScreen(
                 items(episodes) { episode ->
                     com.tavuno.tv.ui.components.FocusableCard(
                         onClick = {
-                            CoroutineScope(Dispatchers.IO).launch {
+                            scope.launch {
                                 val authResult = playbackRepository.authorizeEpisodePlayback(episode.id)
                                 authResult.fold(
                                     onSuccess = { auth ->

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,9 @@ fun MovieDetailsScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var movieDetails by remember { mutableStateOf<MovieDetails?>(null) }
+    // Playback authorization ends in a navigation callback, which must be
+    // invoked on the main thread.
+    val scope = rememberCoroutineScope()
     
     // Load movie details from repository
     CoroutineScope(Dispatchers.IO).launch {
@@ -146,7 +150,7 @@ fun MovieDetailsScreen(
                     
                     Button(
                         onClick = {
-                            CoroutineScope(Dispatchers.IO).launch {
+                            scope.launch {
                                 val authResult = playbackRepository.authorizeMoviePlayback(movieId)
                                 authResult.fold(
                                     onSuccess = { auth ->

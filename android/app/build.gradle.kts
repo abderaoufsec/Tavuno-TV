@@ -44,6 +44,7 @@ android {
         jvmTarget = "17"
         freeCompilerArgs += listOf(
             "-opt-in=androidx.tv.material3.ExperimentalTvMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
         )
     }
@@ -71,6 +72,9 @@ dependencies {
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    // ViewModel + StateFlow-as-state plumbing for the shell ViewModels introduced by the restyle.
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
     implementation("androidx.activity:activity-compose:1.8.1")
 
     // Compose
@@ -79,6 +83,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // Nav-rail / top-bar iconography (LiveTv, SportsSoccer, Movie, Tv …). Resolved by the BOM.
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.tv:tv-foundation:1.0.0-alpha10")
     implementation("androidx.tv:tv-material:1.0.0-alpha10")
 

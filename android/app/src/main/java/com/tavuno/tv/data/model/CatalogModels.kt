@@ -51,7 +51,10 @@ data class Movie(
     @SerializedName("release_year")
     val releaseYear: Int?,
     @SerializedName("is_active")
-    val isActive: Boolean
+    val isActive: Boolean,
+    // Present once the API normalizes Directus file UUIDs into URLs (backend Stage 3.1); absent
+    // today, in which case Gson leaves it null and PosterCard draws its tonal placeholder.
+    val poster: String? = null
 )
 
 data class MovieDetails(
@@ -83,7 +86,9 @@ data class Series(
     val categoryId: Int?,
     val synopsis: String?,
     @SerializedName("is_active")
-    val isActive: Boolean
+    val isActive: Boolean,
+    // Same forward-compatibility note as [Movie.poster].
+    val poster: String? = null
 )
 
 data class SeriesDetails(

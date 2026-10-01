@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,8 +28,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.tavuno.tv.data.model.Match
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.tavuno.tv.ui.theme.TavunoAccent
 import com.tavuno.tv.ui.theme.TavunoSecondary
@@ -43,32 +43,23 @@ fun SportsScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var matches by remember { mutableStateOf<List<Match>>(emptyList())}
     
-    // Load matches based on selected tab
-    CoroutineScope(Dispatchers.IO).launch {
-        val status = if (selectedTab == "live") "live" else "upcoming"
-        val matchesResult = sportsRepository.getMatches(status = status, limit = 50)
-        matchesResult.fold(
-            onSuccess = { matchList ->
-                matches = matchList
-                isLoading = false
-            },
-            onFailure = { error ->
-                errorMessage = error.message
-                isLoading = false
-            }
-        )
-    }
+    val scope = rememberCoroutineScope()
     
-    // Reload when tab changes
-    CoroutineScope(Dispatchers.IO).launch {
+    // Load matches for the selected tab, and reload whenever it changes.
+    // Driven from LaunchedEffect (main dispatcher): reading/writing Compose
+    // state from a bare Dispatchers.IO scope crashes with
+    // "Reading a state that was created after the snapshot was taken".
+    LaunchedEffect(selectedTab) {
         val status = if (selectedTab == "live") "live" else "upcoming"
         val matchesResult = sportsRepository.getMatches(status = status, limit = 50)
         matchesResult.fold(
             onSuccess = { matchList ->
                 matches = matchList
+                isLoading = false
             },
             onFailure = { error ->
                 errorMessage = error.message
+                isLoading = false
             }
         )
     }
@@ -109,17 +100,6 @@ fun SportsScreen(
                 isSelected = selectedTab == "live",
                 onClick = {
                     selectedTab = "live"
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val matchesResult = sportsRepository.getMatches(status = "live", limit = 50)
-                        matchesResult.fold(
-                            onSuccess = { matchList ->
-                                matches = matchList
-                            },
-                            onFailure = { error ->
-                                errorMessage = error.message
-                            }
-                        )
-                    }
                 }
             )
             TabChip(
@@ -127,17 +107,6 @@ fun SportsScreen(
                 isSelected = selectedTab == "upcoming",
                 onClick = {
                     selectedTab = "upcoming"
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val matchesResult = sportsRepository.getMatches(status = "upcoming", limit = 50)
-                        matchesResult.fold(
-                            onSuccess = { matchList ->
-                                matches = matchList
-                            },
-                            onFailure = { error ->
-                                errorMessage = error.message
-                            }
-                        )
-                    }
                 }
             )
         }
@@ -152,7 +121,7 @@ fun SportsScreen(
                 onRetry = {
                     isLoading = true
                     errorMessage = null
-                    CoroutineScope(Dispatchers.IO).launch {
+                    scope.launch {
                         val status = if (selectedTab == "live") "live" else "upcoming"
                         val matchesResult = sportsRepository.getMatches(status = status, limit = 50)
                         matchesResult.fold(

@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
@@ -29,13 +32,18 @@ import androidx.tv.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.tavuno.tv.data.model.Channel
 import com.tavuno.tv.data.model.Category
 import com.tavuno.tv.data.model.ChannelNowNext
+import com.tavuno.tv.data.model.EpgProgram
 import com.tavuno.tv.data.repository.CatalogRepository
 import com.tavuno.tv.ui.theme.TavunoAccent
 import com.tavuno.tv.ui.theme.TavunoSecondary
+
+/** How often visible rows re-read now/next; mirrors the API's 60s cache window. */
+private const val EPG_REFRESH_INTERVAL_MS = 60_000L
 
 @Composable
 fun LiveTvScreen(
@@ -93,23 +101,12 @@ fun LiveTvScreen(
         )
     }
     
-    // Fetch EPG now/next for visible channels
-    LaunchedEffect(channels) {
-        channels.forEach { channel ->
-            coroutineScope.launch {
-                val nowNextResult = catalogRepository.getChannelNowNext(channel.id)
-                nowNextResult.fold(
-                    onSuccess = { nowNext ->
-                        channelNowNextMap = channelNowNextMap.toMutableMap().apply {
-                            this[channel.id] = nowNext
-                        }
-                    },
-                    onFailure = {
-                        // Gracefully handle per-channel EPG failures
-                        // Don't show error for individual channel EPG issues
-                    }
-                )
-            }
+    // Refresh now/next for the visible rows; the API caches each payload for 60s.
+    var epgRefreshTick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(EPG_REFRESH_INTERVAL_MS)
+            epgRefreshTick++
         }
     }
     
@@ -119,6 +116,7 @@ fun LiveTvScreen(
             .padding(48.dp)
     ) {
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -139,20 +137,26 @@ fun LiveTvScreen(
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        // Category filter
-        Row(
+        // Category filter. Kept horizontally scrollable: a plain Row squeezes
+        // overflowing chips to zero width, their labels wrap onto many lines
+        // and the row ends up eating the whole screen, leaving no room for the
+        // channel list below.
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CategoryChip(
-                name = "All",
-                isSelected = selectedCategory == null,
-                onClick = {
-                    selectedCategory = null
-                }
-            )
+            item {
+                CategoryChip(
+                    name = "All",
+                    isSelected = selectedCategory == null,
+                    onClick = {
+                        selectedCategory = null
+                    }
+                )
+            }
             
-            categories.forEach { category ->
+            items(categories, key = { it.id }) { category ->
                 CategoryChip(
                     name = category.name,
                     isSelected = selectedCategory?.id == category.id,
@@ -202,13 +206,26 @@ fun LiveTvScreen(
             com.tavuno.tv.ui.components.EmptyState("No channels available")
         } else {
             LazyColumn(
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(channels, key = { it.id }) { channel ->
                     val nowNext = channelNowNextMap[channel.id]
+                    // Fetch lazily per visible row: avoids firing one request per
+                    // channel at once, and refreshes when the tick advances.
+                    LaunchedEffect(channel.id, epgRefreshTick) {
+                        catalogRepository.getChannelNowNext(channel.id).fold(
+                            onSuccess = { loaded ->
+                                channelNowNextMap = channelNowNextMap + (channel.id to loaded)
+                            },
+                            onFailure = {
+                                // Per-channel EPG failures are non-fatal: keep the list usable.
+                            }
+                        )
+                    }
                     ChannelCard(
                         channel = channel,
-                        currentProgram = nowNext?.now?.title,
+                        nowNext = nowNext,
                         onClick = { onNavigateToPlayer(channel.id) }
                     )
                 }
@@ -231,42 +248,42 @@ fun CategoryChip(
             ButtonDefaults.colors(containerColor = TavunoSecondary)
         }
     ) {
-        Text(name)
+        Text(
+            text = name,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
 @Composable
 fun ChannelCard(
     channel: Channel,
-    currentProgram: String?,
+    nowNext: ChannelNowNext?,
     onClick: () -> Unit
 ) {
     com.tavuno.tv.ui.components.FocusableCard(
         onClick = onClick,
         modifier = Modifier
-            .fillMaxSize()
-            .height(80.dp)
+            .fillMaxWidth()
+            .height(112.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
+            modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = channel.name,
-                    style = MaterialTheme.typography.titleLarge
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                if (currentProgram != null) {
-                    Text(
-                        text = currentProgram,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                NowNextLine(prefix = "NOW", program = nowNext?.now)
+                NowNextLine(prefix = "NEXT", program = nowNext?.next)
             }
+            Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = "▶",
                 style = MaterialTheme.typography.headlineMedium,
@@ -274,4 +291,26 @@ fun ChannelCard(
             )
         }
     }
+}
+
+/** Renders "NOW  14:10 - 14:15  •  Programme title" style EPG lines. */
+@Composable
+private fun NowNextLine(
+    prefix: String,
+    program: EpgProgram?
+) {
+    if (program == null) return
+
+    val timeRange = EpgTimeFormat.rangeLabel(program.startsAt, program.endsAt)
+    Text(
+        text = if (timeRange != null) {
+            "$prefix  $timeRange  •  ${program.title}"
+        } else {
+            "$prefix  •  ${program.title}"
+        },
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }

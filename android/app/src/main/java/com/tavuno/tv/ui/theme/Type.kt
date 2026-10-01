@@ -6,110 +6,72 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Typography
 
-val TavunoTypography = Typography(
-    displayLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Bold,
-        fontSize = 57.sp,
-        lineHeight = 64.sp,
-        letterSpacing = 0.sp
-    ),
-    displayMedium = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Bold,
-        fontSize = 45.sp,
-        lineHeight = 52.sp,
-        letterSpacing = 0.sp
-    ),
-    displaySmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Bold,
-        fontSize = 36.sp,
-        lineHeight = 44.sp,
-        letterSpacing = 0.sp
-    ),
-    headlineLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 32.sp,
-        lineHeight = 40.sp,
-        letterSpacing = 0.sp
-    ),
-    headlineMedium = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
-        lineHeight = 36.sp,
-        letterSpacing = 0.sp
-    ),
-    headlineSmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        lineHeight = 32.sp,
-        letterSpacing = 0.sp
-    ),
-    titleLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        letterSpacing = 0.sp
-    ),
-    titleMedium = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.15.sp
-    ),
-    titleSmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.1.sp
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.25.sp
-    ),
-    bodySmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.4.sp
-    ),
-    labelLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.1.sp
-    ),
-    labelMedium = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
+/**
+ * Typography tuned for the 10-foot TV experience, ported from the OwnTV-Baseline design system:
+ * larger sizes and generous weights so text stays legible from across the room. The selected family
+ * is supplied by [TavunoTheme]; slots Tavuno has not size-tuned keep tv-material's metrics with the
+ * family applied.
+ */
+fun tavunoTypography(fontFamily: FontFamily = FontFamily.SansSerif): Typography {
+    val defaults = Typography()
+    return Typography(
+        displayLarge = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 40.sp,
+            lineHeight = 48.sp,
+        ),
+        displayMedium = defaults.displayMedium.copy(fontFamily = fontFamily),
+        displaySmall = defaults.displaySmall.copy(fontFamily = fontFamily),
+        headlineLarge = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 30.sp,
+            lineHeight = 36.sp,
+        ),
+        headlineMedium = defaults.headlineMedium.copy(fontFamily = fontFamily),
+        headlineSmall = defaults.headlineSmall.copy(fontFamily = fontFamily),
+        titleLarge = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+        ),
+        titleMedium = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 18.sp,
+            lineHeight = 24.sp,
+        ),
+        titleSmall = defaults.titleSmall.copy(fontFamily = fontFamily),
+        bodyLarge = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
+        ),
+        bodyMedium = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+        ),
+        bodySmall = defaults.bodySmall.copy(fontFamily = fontFamily),
+        labelLarge = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+        ),
+        labelMedium = TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+        ),
+        labelSmall = defaults.labelSmall.copy(fontFamily = fontFamily),
     )
-)
+}
+
+/** Retained for callers that read the default ramp directly. */
+val TavunoTypography: Typography = tavunoTypography()
