@@ -20,6 +20,18 @@ from .models import (
     ChannelDetails, MovieDetails, SeriesDetails, SeasonDetails,
     Competition, Team, Match, MatchDetails
 )
+from .scope import live_channel_limit, live_channel_scope, scope_int, scope_text
+from ..customize.ordering import apply_overrides
+from ..customize.service import CustomizeService
+
+# Which customization kind applies to a category read, keyed by the catalog
+# "kind" the endpoint was asked for. A read with no kind (every category) has no
+# single customization list to apply and is therefore left in natural order.
+CATEGORY_CUSTOMIZE_KIND = {
+    "live": "live_category",
+    "movie": "movie_category",
+    "series": "series_category",
+}
 
 
 class CatalogService:
@@ -40,61 +52,41 @@ class CatalogService:
             yield connection
 
     # --- Live-channel test scope ------------------------------------------
-    # Free-launch testing needs a handful of verified-working channels instead
-    # of the full synced catalog. These helpers translate the settings into an
-    # additive SQL filter so the underlying data is never mutated and lifting
-    # the test scope is a config change (empty allowlist + limit 0 = no filter).
+    # Thin delegates over app.catalog.scope, which owns the implementation and
+    # is shared with the EPG guide so both readers filter channels identically.
 
     @staticmethod
     def _scope_text(value: Any) -> str:
         """Coerce a settings value to text; non-strings (e.g. test doubles) -> ""."""
-        return value.strip() if isinstance(value, str) else ""
+        return scope_text(value)
 
     @staticmethod
     def _scope_int(value: Any) -> int:
         """Coerce a settings value to int; anything unusable -> 0."""
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return 0
+        return scope_int(value)
 
     def _live_channel_scope(self) -> tuple:
-        """Return an extra WHERE fragment + params restricting live channels.
-
-        The allowlist accepts numeric channel IDs and/or slugs, comma separated.
-        Returns ``("", [])`` when no allowlist is configured.
-        """
-        settings = getattr(self.services, "settings", None)
-        allowlist = self._scope_text(getattr(settings, "live_channel_allowlist", ""))
-        if not allowlist:
-            return "", []
-
-        ids: List[int] = []
-        slugs: List[str] = []
-        for token in (part.strip() for part in allowlist.split(",")):
-            if not token:
-                continue
-            if token.lstrip("+-").isdigit():
-                ids.append(int(token))
-            else:
-                slugs.append(token)
-
-        clauses: List[str] = []
-        params: List[Any] = []
-        if ids:
-            clauses.append("id = ANY(%s)")
-            params.append(ids)
-        if slugs:
-            clauses.append("slug = ANY(%s)")
-            params.append(slugs)
-        if not clauses:
-            return "", []
-        return " AND (" + " OR ".join(clauses) + ")", params
+        """Return an extra WHERE fragment + params restricting live channels."""
+        return live_channel_scope(getattr(self.services, "settings", None))
 
     def _live_channel_limit(self) -> int:
         """Cap on how many live channels are listed; 0 means unlimited."""
-        settings = getattr(self.services, "settings", None)
-        return max(0, self._scope_int(getattr(settings, "live_channel_limit", 0)))
+        return live_channel_limit(getattr(self.services, "settings", None))
+
+    def _apply_profile_overrides(self, items: List[Any], profile_id: Optional[int], kind: str) -> List[Any]:
+        """Filter and reorder ``items`` by a profile's stored customization.
+
+        A no-op when no profile is supplied, so an unauthenticated/legacy caller
+        sees exactly the pre-customization behaviour. Applying happens in Python
+        rather than SQL because the catalog is small (the whole channel list is
+        already fetched) and because the ordering rule — pinned first, then the
+        natural order — is a pure function worth testing
+        (:func:`app.customize.ordering.apply_overrides`).
+        """
+        if profile_id is None:
+            return items
+        overrides = CustomizeService(self.services).overrides(int(profile_id), kind)
+        return apply_overrides(items, overrides)
 
     def _map_channel(self, row: dict) -> Channel:
         """Map database row to Channel model.
@@ -235,12 +227,13 @@ class CatalogService:
             is_active=row["is_active"],
         )
 
-    def get_channels(self, category_id: Optional[int] = None) -> List[Channel]:
+    def get_channels(self, category_id: Optional[int] = None, profile_id: Optional[int] = None) -> List[Channel]:
         """Get all active channels, optionally filtered by category.
-        
+
         Args:
             category_id: Optional category ID to filter channels
-            
+            profile_id: Optional profile whose rail order/visibility to apply
+
         Returns:
             List of Channel models
         """
@@ -263,8 +256,9 @@ class CatalogService:
 
         with self._db() as conn:
             rows = conn.execute(query, tuple(parameters)).fetchall()
-        
-        return [self._map_channel(row) for row in rows]
+
+        channels = [self._map_channel(row) for row in rows]
+        return self._apply_profile_overrides(channels, profile_id, "live_channel")
 
     def get_channel(self, channel_id: int) -> Optional[Channel]:
         """Get a single channel by ID.
@@ -286,12 +280,13 @@ class CatalogService:
         
         return self._map_channel(row)
 
-    def get_categories(self, kind: Optional[str] = None) -> List[Category]:
+    def get_categories(self, kind: Optional[str] = None, profile_id: Optional[int] = None) -> List[Category]:
         """Get all active categories, optionally filtered by kind.
-        
+
         Args:
             kind: Optional kind filter (e.g., "live", "movie", "series", "sports")
-            
+            profile_id: Optional profile whose rail order/visibility to apply
+
         Returns:
             List of Category models
         """
@@ -306,8 +301,12 @@ class CatalogService:
         
         with self._db() as conn:
             rows = conn.execute(query, parameters).fetchall()
-        
-        return [self._map_category(row) for row in rows]
+
+        categories = [self._map_category(row) for row in rows]
+        customize_kind = CATEGORY_CUSTOMIZE_KIND.get(kind or "")
+        if customize_kind is None:
+            return categories
+        return self._apply_profile_overrides(categories, profile_id, customize_kind)
 
     def get_category(self, category_id: int) -> Optional[Category]:
         """Get a single category by ID.
@@ -474,9 +473,12 @@ class CatalogService:
             "series": [self._map_series(row) for row in series_rows],
         }
 
-    def get_home(self) -> dict:
+    def get_home(self, profile_id: Optional[int] = None) -> dict:
         """Get home page data (categories and featured channels).
-        
+
+        Args:
+            profile_id: Optional profile whose channel rail order/visibility to apply
+
         Returns:
             Dictionary with 'categories' and 'featured_channels' keys
         """
@@ -497,7 +499,9 @@ class CatalogService:
         
         return {
             "categories": [self._map_category(row) for row in categories],
-            "featured_channels": [self._map_channel(row) for row in channels],
+            "featured_channels": self._apply_profile_overrides(
+                [self._map_channel(row) for row in channels], profile_id, "live_channel"
+            ),
         }
 
     def get_channel_details(self, channel_id: int) -> Optional[ChannelDetails]:

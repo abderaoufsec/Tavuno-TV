@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager, contextmanager
 from typing import Annotated, Any
 import time
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status, Header
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,11 @@ from .auth.router import router as auth_router
 from .devices.router import router as devices_router
 from .auth.deps import current_principal, require_admin
 from .catalog.service import CatalogService
+from .customize.models import CustomizationPayload
+from .customize.service import CustomizeService
+from .epg.service import EpgService, parse_timestamp
+from .profiles.models import CreateProfileRequest, UpdateProfileRequest
+from .profiles.service import ProfilesService
 from .session_reaper import reap_expired_sessions
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
@@ -108,6 +113,32 @@ def get_services(request: Request) -> Services:
 ServicesDependency = Annotated[Services, Depends(get_services)]
 
 
+def profile_id_of(principal: Any) -> int | None:
+    """The signed-in profile id, or ``None`` when there isn't one.
+
+    ``tests/test_api.py`` invokes route handlers directly, so ``principal`` is the
+    unresolved ``Depends`` marker rather than a dict. Treating anything that is not
+    a dict as "no profile" keeps those calls working and, more importantly, makes a
+    missing principal degrade to the plain un-customized catalog instead of a 500.
+    """
+    if not isinstance(principal, dict):
+        return None
+    value = principal.get("profile_id")
+    return int(value) if value is not None else None
+
+
+def require_profile_id(principal: Any) -> int:
+    """The signed-in profile id, or a 401 when the caller has none.
+
+    Customization and profiles are meaningless without an owner, so a caller that
+    reaches them unauthenticated gets a 401 rather than a 500 from a KeyError.
+    """
+    profile_id = profile_id_of(principal)
+    if profile_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    return profile_id
+
+
 @contextmanager
 def database(services: Services):
     with services.connection() as connection:
@@ -132,13 +163,13 @@ def health(services: ServicesDependency) -> dict[str, Any]:
 @app.get("/v1/home", tags=["catalog"])
 def home(services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     catalog = CatalogService(services)
-    return catalog.get_home()
+    return catalog.get_home(profile_id=profile_id_of(principal))
 
 
 @app.get("/v1/channels", tags=["catalog"])
 def list_channels(services: ServicesDependency, category_id: int | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     catalog = CatalogService(services)
-    channels = catalog.get_channels(category_id=category_id)
+    channels = catalog.get_channels(category_id=category_id, profile_id=profile_id_of(principal))
     return [channel.model_dump() for channel in channels]
 
 
@@ -206,7 +237,7 @@ def epg(services: ServicesDependency, channel_id: int | None = None, principal: 
 @app.get("/v1/categories", tags=["catalog"])
 def list_categories(services: ServicesDependency, kind: str | None = None, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
     catalog = CatalogService(services)
-    categories = catalog.get_categories(kind=kind)
+    categories = catalog.get_categories(kind=kind, profile_id=profile_id_of(principal))
     return [category.model_dump() for category in categories]
 
 
@@ -400,6 +431,143 @@ def channel_epg_now_next(channel_id: int, services: ServicesDependency, principa
     }
     services.cache_now_next(channel_id, payload)
     return payload
+
+
+@app.get("/v1/epg/window", tags=["epg"])
+def epg_window(
+    services: ServicesDependency,
+    start: str,
+    end: str,
+    channel_ids: list[int] | None = Query(default=None),
+    category_id: int | None = None,
+    limit: int | None = None,
+    principal: dict = Depends(current_principal),
+) -> dict[str, Any]:
+    """Windowed guide (Slice C): every channel's programmes overlapping [start, end).
+
+    One query for the whole grid, channels name-ordered and capped, and filtered
+    through the same live-channel test scope the channel list uses — so the guide
+    can never advertise a channel `/v1/channels` refuses to show.
+    """
+    epg = EpgService(services)
+    try:
+        window = epg.window(
+            window_start=parse_timestamp(start),
+            window_end=parse_timestamp(end),
+            channel_ids=channel_ids,
+            category_id=category_id,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return window.model_dump()
+
+
+# --- Customization (Slice D) -------------------------------------------------
+#
+# Per-profile rail order and visibility for channels and categories. A PUT is a
+# full replace for one kind: the client sends the complete list it just rendered,
+# which is what makes "un-pin" expressible. Reads are always scoped to the
+# caller's profile, so one account cannot read or write another's overrides.
+
+
+@app.get("/v1/customize/{kind}", tags=["customize"])
+def get_customizations(kind: str, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
+    """The caller's overrides for one kind."""
+    try:
+        result = CustomizeService(services).list(require_profile_id(principal), kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result.model_dump()
+
+
+@app.put("/v1/customize/{kind}", tags=["customize"])
+def put_customizations(
+    kind: str,
+    payload: CustomizationPayload,
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+) -> dict[str, Any]:
+    """Replace the caller's overrides for one kind."""
+    try:
+        result = CustomizeService(services).save(require_profile_id(principal), kind, payload.items)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result.model_dump()
+
+
+@app.delete("/v1/customize/{kind}", tags=["customize"])
+def delete_customizations(kind: str, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
+    """Drop the caller's overrides for one kind, restoring the natural catalog order."""
+    try:
+        removed = CustomizeService(services).reset(require_profile_id(principal), kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"kind": kind, "removed": removed}
+
+
+# --- Profiles (Slice D) ------------------------------------------------------
+#
+# One account (the caller's own profile) may own several child viewing profiles.
+# The account row is editable here but never deletable — that would orphan a
+# subscription — so DELETE only ever removes an extra viewer.
+
+
+@app.get("/v1/profiles", tags=["profiles"])
+def list_profiles(services: ServicesDependency, principal: dict = Depends(current_principal)) -> list[dict[str, Any]]:
+    """The account plus its child profiles, account first."""
+    require_profile_id(principal)
+    return [profile.model_dump() for profile in ProfilesService(services).list_for(principal)]
+
+
+@app.post("/v1/profiles", tags=["profiles"], status_code=status.HTTP_201_CREATED)
+def create_profile(
+    request: CreateProfileRequest,
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+) -> dict[str, Any]:
+    """Add a viewing profile under the caller's account."""
+    require_profile_id(principal)
+    try:
+        created = ProfilesService(services).create(
+            principal, request.display_name, request.avatar, request.is_kids
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return created.model_dump()
+
+
+@app.patch("/v1/profiles/{profile_id}", tags=["profiles"])
+def update_profile(
+    profile_id: int,
+    request: UpdateProfileRequest,
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+) -> dict[str, Any]:
+    """Rename/re-flag the account or one of its children."""
+    require_profile_id(principal)
+    try:
+        updated = ProfilesService(services).update(
+            principal, profile_id, request.display_name, request.avatar, request.is_kids
+        )
+    except ValueError as exc:
+        if str(exc) == "profile_not_found":
+            raise HTTPException(status_code=404, detail="Profile not found") from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return updated.model_dump()
+
+
+@app.delete("/v1/profiles/{profile_id}", tags=["profiles"])
+def delete_profile(profile_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
+    """Remove a child profile. The account row itself is not deletable."""
+    require_profile_id(principal)
+    try:
+        ProfilesService(services).delete(principal, profile_id)
+    except ValueError as exc:
+        if str(exc) == "profile_not_found":
+            raise HTTPException(status_code=404, detail="Profile not found") from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"deleted": True, "profile_id": profile_id}
 
 
 class SessionRequest(BaseModel):
