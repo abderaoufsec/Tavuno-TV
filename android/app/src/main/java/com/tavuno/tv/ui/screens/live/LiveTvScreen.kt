@@ -25,11 +25,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.tavuno.tv.core.LiveChannelQueue
 import com.tavuno.tv.data.model.Category
 import com.tavuno.tv.data.model.Channel
 import com.tavuno.tv.data.model.ChannelNowNext
 import com.tavuno.tv.data.model.EpgProgram
 import com.tavuno.tv.data.repository.CatalogRepository
+import com.tavuno.tv.playback.toZapChannel
 import com.tavuno.tv.ui.components.ChannelLogoPlate
 import com.tavuno.tv.ui.components.EmptyState
 import com.tavuno.tv.ui.components.ErrorState
@@ -166,7 +168,14 @@ fun LiveTvScreen(
                     ChannelRow(
                         channel = channel,
                         nowNext = channelNowNextMap[channel.id],
-                        onClick = { onNavigateToPlayer(channel.id) },
+                        onClick = {
+                            // Arm the player's zap list with what the viewer is browsing, then tune.
+                            LiveChannelQueue.publish(
+                                channels = channels.map { it.toZapChannel() },
+                                currentChannelId = channel.id,
+                            )
+                            onNavigateToPlayer(channel.id)
+                        },
                     )
                 }
             }

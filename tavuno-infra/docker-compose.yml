@@ -318,6 +318,11 @@ services:
       AUTH_OPEN_ACCESS: ${AUTH_OPEN_ACCESS:-true}
       AUTH_GUEST_EMAIL: ${AUTH_GUEST_EMAIL:-guest@tavuno.local}
       AUTH_GUEST_DEVICE_KEY: ${AUTH_GUEST_DEVICE_KEY:-tavuno-tv-guest}
+      # Live-channel test scope: restrict /v1/channels and /v1/home to a small
+      # set of verified-working channels while testing. An empty allowlist plus
+      # limit 0 exposes the full synced catalog (production).
+      TAVUNO_LIVE_CHANNEL_ALLOWLIST: ${TAVUNO_LIVE_CHANNEL_ALLOWLIST:-}
+      TAVUNO_LIVE_CHANNEL_LIMIT: ${TAVUNO_LIVE_CHANNEL_LIMIT:-0}
 
     healthcheck:
       test:

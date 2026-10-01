@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.tavuno.tv.core.LiveChannelQueue
 import com.tavuno.tv.data.model.Match
 import com.tavuno.tv.data.repository.SportsRepository
 import com.tavuno.tv.ui.components.EmptyState
@@ -116,7 +117,15 @@ fun SportsScreen(
                 items(matches, key = { it.id }) { match ->
                     MatchRow(
                         match = match,
-                        onClick = { match.channelId?.let(onNavigateToPlayer) },
+                        onClick = {
+                            match.channelId?.let { channelId ->
+                                // Sports tunes a single channel: drop any list a browse screen
+                                // armed, so zapping degrades honestly instead of walking a stale
+                                // list (see LiveChannelQueue's contract).
+                                LiveChannelQueue.clear()
+                                onNavigateToPlayer(channelId)
+                            }
+                        },
                     )
                 }
             }

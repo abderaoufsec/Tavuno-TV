@@ -3,6 +3,7 @@ package com.tavuno.tv.data.repository
 import com.tavuno.tv.data.api.TavunoApiService
 import com.tavuno.tv.data.local.SessionManager
 import com.tavuno.tv.data.model.*
+import com.tavuno.tv.network.NetworkModule
 import kotlinx.coroutines.flow.first
 
 class AuthRepository(
@@ -114,7 +115,7 @@ class AuthRepository(
     
     suspend fun getSubscription(): Result<Subscription> {
         return try {
-            val response = apiService.getSubscription("Bearer ${getAccessToken()}")
+            val response = apiService.getSubscription(authorizationHeader())
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
@@ -125,7 +126,16 @@ class AuthRepository(
         }
     }
     
-    private suspend fun getAccessToken(): String {
-        return sessionManager.accessToken.first() ?: throw Exception("No access token available")
+    /**
+     * Build the Authorization header, or null in free-launch (AUTH_OPEN_ACCESS)
+     * guest mode where no token exists. Retrofit omits a null header so the
+     * backend resolves its seeded guest identity.
+     */
+    private suspend fun authorizationHeader(): String? {
+        val token = sessionManager.accessToken.first()
+        if (!token.isNullOrBlank()) {
+            NetworkModule.updateAuthToken(token)
+        }
+        return bearerAuthorization(token)
     }
 }

@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     auth_guest_email: str = Field(default="guest@tavuno.local", validation_alias="AUTH_GUEST_EMAIL")
     auth_guest_device_key: str = Field(default="tavuno-tv-guest", validation_alias="AUTH_GUEST_DEVICE_KEY")
 
+    # Live-channel test scoping. Both knobs are additive filters applied when
+    # the catalog is listed; the synced data is never touched, so lifting the
+    # test scope is a config change rather than a re-sync.
+    #   TAVUNO_LIVE_CHANNEL_ALLOWLIST = "6853,6854,8845"  -> only those channels
+    #   TAVUNO_LIVE_CHANNEL_LIMIT     = 10                 -> first 10 by name
+    # Empty allowlist + limit 0 exposes the whole synced catalog (production).
+    live_channel_allowlist: str = Field(default="", validation_alias="TAVUNO_LIVE_CHANNEL_ALLOWLIST")
+    live_channel_limit: int = Field(default=0, validation_alias="TAVUNO_LIVE_CHANNEL_LIMIT")
+
     # Email service (M8.5)
     email_enabled: bool = Field(default=False, validation_alias="EMAIL_ENABLED")
     email_from_address: str = Field(default="noreply@tavuno.com", validation_alias="EMAIL_FROM_ADDRESS")

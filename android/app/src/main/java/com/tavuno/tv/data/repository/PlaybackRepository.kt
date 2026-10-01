@@ -3,6 +3,7 @@ package com.tavuno.tv.data.repository
 import com.tavuno.tv.data.api.TavunoApiService
 import com.tavuno.tv.data.local.SessionManager
 import com.tavuno.tv.data.model.*
+import com.tavuno.tv.network.NetworkModule
 import kotlinx.coroutines.flow.first
 
 class PlaybackRepository(
@@ -12,8 +13,8 @@ class PlaybackRepository(
     
     suspend fun authorizeLivePlayback(channelId: Int): Result<PlaybackAuthorization> {
         return try {
-            val accessToken = getAccessToken()
-            val response = apiService.authorizeLivePlayback(channelId, "Bearer $accessToken")
+            val authorization = authorizationHeader()
+            val response = apiService.authorizeLivePlayback(channelId, authorization)
             
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
@@ -35,8 +36,8 @@ class PlaybackRepository(
     
     suspend fun authorizeMoviePlayback(movieId: Int): Result<PlaybackAuthorization> {
         return try {
-            val accessToken = getAccessToken()
-            val response = apiService.authorizeMoviePlayback(movieId, "Bearer $accessToken")
+            val authorization = authorizationHeader()
+            val response = apiService.authorizeMoviePlayback(movieId, authorization)
             
             if (response.isSuccessful && response.body() != null) {
                 val movieAuth = response.body()!!
@@ -72,8 +73,8 @@ class PlaybackRepository(
     
     suspend fun authorizeEpisodePlayback(episodeId: Int): Result<PlaybackAuthorization> {
         return try {
-            val accessToken = getAccessToken()
-            val response = apiService.authorizeEpisodePlayback(episodeId, "Bearer $accessToken")
+            val authorization = authorizationHeader()
+            val response = apiService.authorizeEpisodePlayback(episodeId, authorization)
             
             if (response.isSuccessful && response.body() != null) {
                 val episodeAuth = response.body()!!
@@ -137,7 +138,21 @@ class PlaybackRepository(
         }
     }
     
-    private suspend fun getAccessToken(): String {
-        return sessionManager.accessToken.first() ?: throw Exception("No access token available")
+    /**
+     * Build the Authorization header for playback calls.
+     *
+     * Free launch (AUTH_OPEN_ACCESS) runs without a login: there is no access
+     * token to send. Returning null lets Retrofit omit the header so the
+     * backend resolves its seeded guest identity instead of the app failing
+     * with "No access token available".
+     */
+    private suspend fun authorizationHeader(): String? {
+        val token = sessionManager.accessToken.first()
+        // Keep the shared OkHttp interceptor in sync for signed-in users; a
+        // guest keeps the interceptor clear so nothing invents a token.
+        if (!token.isNullOrBlank()) {
+            NetworkModule.updateAuthToken(token)
+        }
+        return bearerAuthorization(token)
     }
 }
