@@ -47,6 +47,7 @@ class FakeServices:
         self.ome.get_health.return_value = {"status": "ok", "code": 200}
         self.sync = MagicMock()
         self.sync.last_sync.return_value = None
+        self.now_next_cache = {}
 
     def health(self):
         return {
@@ -58,6 +59,12 @@ class FakeServices:
 
     def cached_json(self, key, loader):
         return loader()
+
+    def get_cached_now_next(self, channel_id):
+        return self.now_next_cache.get(channel_id)
+
+    def cache_now_next(self, channel_id, payload):
+        self.now_next_cache[channel_id] = payload
 
     @contextmanager
     def connection(self):
@@ -390,6 +397,23 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(resp["now"]["title"], "Evening News")
         self.assertIsNotNone(resp["next"])
         self.assertEqual(resp["next"]["title"], "Prime Movie")
+
+    def test_epg_now_next_caches_payload(self):
+        """First call stores the payload so later calls skip the database."""
+        channel_epg_now_next(7, self.services)
+        self.assertIn(7, self.services.now_next_cache)
+
+    def test_epg_now_next_prefers_cached_payload(self):
+        """A cached payload is returned untouched without hitting the database."""
+        sentinel = {
+            "channel_id": 5,
+            "now": {"id": 42, "title": "Cached Show"},
+            "next": None,
+            "later": None,
+        }
+        self.services.now_next_cache[5] = sentinel
+        resp = channel_epg_now_next(5, self.services)
+        self.assertEqual(resp, sentinel)
 
     def test_ome_client_playback_url(self):
         ome = OmeClient(api_url="http://localhost:8081", playback_base_url="http://localhost:8080/media")

@@ -325,10 +325,25 @@ class SyncService:
                     (channel_id,),
                 ).fetchone()
                 if existing_epg:
-                    connection.execute(
-                        "UPDATE tavuno_epg_channels SET external_id = %s WHERE id = %s",
+                    # Only re-point this channel's EPG mapping when the target
+                    # external_id is not already owned by a different EPG row,
+                    # otherwise the unique constraint on external_id aborts the
+                    # whole sync (e.g. two channels resolving to the same tvg_id).
+                    conflicting_epg = connection.execute(
+                        "SELECT id FROM tavuno_epg_channels WHERE external_id = %s AND id <> %s",
                         (tvg_id, existing_epg["id"]),
-                    )
+                    ).fetchone()
+                    if conflicting_epg:
+                        logger.warning(
+                            "EPG external_id %s already owned by another EPG row, keeping existing mapping for channel %s",
+                            tvg_id,
+                            channel_id,
+                        )
+                    else:
+                        connection.execute(
+                            "UPDATE tavuno_epg_channels SET external_id = %s WHERE id = %s",
+                            (tvg_id, existing_epg["id"]),
+                        )
                 else:
                     # Check if tvg_id already exists to avoid duplicate constraint violation
                     existing_tvg = connection.execute(

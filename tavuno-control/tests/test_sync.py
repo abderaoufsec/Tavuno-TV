@@ -133,7 +133,39 @@ class FakeDispatcharr:
         ]
 
 
+class ConflictEpgConnection(RecordingConnection):
+    """Channel already exists with an EPG mapping; external_id conflict is configurable."""
+
+    def __init__(self, has_conflict: bool):
+        super().__init__()
+        self.has_conflict = has_conflict
+
+    def fetchone(self):
+        if "FROM tavuno_channels WHERE slug" in self.query:
+            return {"id": 42}
+        if "FROM tavuno_epg_channels" in self.query and "channel = %s" in self.query and "external_id" not in self.query:
+            return {"id": 7}
+        if "FROM tavuno_epg_channels" in self.query and "id <>" in self.query:
+            return {"id": 99} if self.has_conflict else None
+        return super().fetchone()
+
+
 class SyncServiceTests(unittest.TestCase):
+    def _sync_service(self):
+        return SyncService(FakeDispatcharr(), redis=MagicMock(), expected_version="0.28.0")
+
+    def test_sync_channels_updates_epg_external_id_without_conflict(self):
+        connection = ConflictEpgConnection(has_conflict=False)
+        self._sync_service().sync_channels(connection)
+        updates = [q for q, _ in connection.statements if "UPDATE tavuno_epg_channels" in q]
+        self.assertTrue(updates, "expected external_id to be re-pointed when unowned")
+
+    def test_sync_channels_skips_epg_update_when_external_id_conflict(self):
+        connection = ConflictEpgConnection(has_conflict=True)
+        self._sync_service().sync_channels(connection)
+        updates = [q for q, _ in connection.statements if "UPDATE tavuno_epg_channels" in q]
+        self.assertFalse(updates, "must not overwrite an external_id owned by another EPG row")
+
     def test_sync_all_imports_channels_streams_and_vod(self):
         connection = RecordingConnection()
         redis = MagicMock()

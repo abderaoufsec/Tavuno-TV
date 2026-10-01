@@ -2,6 +2,8 @@
 Integration tests for Tavuno TV against real Docker infrastructure.
 These tests require all services to be running via docker compose.
 """
+import os
+
 import pytest
 import httpx
 import time
@@ -24,6 +26,36 @@ def caddy_base():
 def dispatcharr_base():
     """Base URL for Dispatcharr."""
     return "http://localhost:9191"
+
+
+@pytest.fixture(scope="module")
+def auth_headers(api_base: str) -> dict:
+    """Log in as the lab admin profile and return Authorization headers.
+
+    Credentials default to the local lab account (override with
+    TAVUNO_TEST_EMAIL / TAVUNO_TEST_PASSWORD).
+    """
+    email = os.getenv("TAVUNO_TEST_EMAIL", "m9test@tavunotv.local")
+    password = os.getenv("TAVUNO_TEST_PASSWORD", "test123")
+    try:
+        response = httpx.post(
+            f"{api_base}/v1/auth/login",
+            json={
+                "email": email,
+                "password": password,
+                "device_fingerprint": "integration-tests",
+                "platform": "web",
+            },
+            timeout=10,
+        )
+    except httpx.HTTPError as exc:
+        pytest.skip(f"API login unavailable: {exc}")
+    if response.status_code != 200:
+        pytest.skip(f"integration login failed: HTTP {response.status_code}")
+    token = response.json().get("access_token")
+    if not token:
+        pytest.skip("integration login returned no access_token")
+    return {"Authorization": f"Bearer {token}"}
 
 
 class TestHealth:
@@ -163,20 +195,22 @@ class TestPlaybackAuthorization:
 class TestEPG:
     """EPG tests (M5)."""
 
-    def test_epg_by_channel(self, api_base: str):
+    def test_epg_by_channel(self, api_base: str, auth_headers: dict):
         """Test EPG endpoint with channel filter."""
         response = httpx.get(
             f"{api_base}/v1/epg?channel_id=2",
+            headers=auth_headers,
             timeout=5,
         )
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
-    def test_epg_now_next(self, api_base: str):
+    def test_epg_now_next(self, api_base: str, auth_headers: dict):
         """Test NOW/NEXT/LATER endpoint."""
         response = httpx.get(
             f"{api_base}/v1/epg/channel/2/now-next",
+            headers=auth_headers,
             timeout=5,
         )
         assert response.status_code == 200
@@ -184,6 +218,22 @@ class TestEPG:
         assert "now" in data
         assert "next" in data
         assert "later" in data
+
+    def test_epg_now_next_is_cached(self, api_base: str, auth_headers: dict):
+        """Repeated NOW/NEXT calls serve the cached payload (identical bodies)."""
+        first = httpx.get(
+            f"{api_base}/v1/epg/channel/2/now-next",
+            headers=auth_headers,
+            timeout=5,
+        )
+        second = httpx.get(
+            f"{api_base}/v1/epg/channel/2/now-next",
+            headers=auth_headers,
+            timeout=5,
+        )
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert first.json() == second.json()
 
 
 class TestDispatcharr:

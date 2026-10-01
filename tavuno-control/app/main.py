@@ -357,10 +357,14 @@ def get_match_details(match_id: int, services: ServicesDependency, principal: di
 @app.get("/v1/epg/channel/{channel_id}/now-next", tags=["epg"])
 def channel_epg_now_next(channel_id: int, services: ServicesDependency, principal: dict = Depends(current_principal)) -> dict[str, Any]:
     """Return NOW, NEXT, and LATER programmes for a specific channel (M5)."""
+    cached = services.get_cached_now_next(channel_id)
+    if cached is not None:
+        return cached
+
     with database(services) as connection:
         programmes = connection.execute(
             """
-            SELECT p.id, p.title, p.starts_at, p.ends_at, p.description
+            SELECT p.id, p.title, p.starts_at, p.ends_at, p.description, e.channel AS channel_id
             FROM tavuno_epg_programmes p
             JOIN tavuno_epg_channels e ON e.id = p.epg_channel
             WHERE e.channel = %s AND p.ends_at >= NOW()
@@ -370,12 +374,14 @@ def channel_epg_now_next(channel_id: int, services: ServicesDependency, principa
             (channel_id,),
         ).fetchall()
 
-    return {
+    payload = {
         "channel_id": channel_id,
         "now": programmes[0] if len(programmes) > 0 else None,
         "next": programmes[1] if len(programmes) > 1 else None,
         "later": programmes[2] if len(programmes) > 2 else None,
     }
+    services.cache_now_next(channel_id, payload)
+    return payload
 
 
 class SessionRequest(BaseModel):

@@ -14,6 +14,22 @@ from .sync_service import CATALOG_CACHE_PREFIX, SyncService
 
 EPG_CACHE_PREFIX = "tavuno:epg:"
 EPG_CACHE_TTL = 300  # 5 minutes
+NOW_NEXT_CACHE_PREFIX = f"{EPG_CACHE_PREFIX}now-next:"
+NOW_NEXT_CACHE_TTL = 60  # keep "now" fresh while absorbing client refresh loops
+
+
+def json_default(value: Any) -> str:
+    """Serialize values the same way FastAPI does, so cache hits match cache misses.
+
+    FastAPI/pydantic render UTC datetimes with a "Z" suffix
+    ("2026-10-01T14:10:00Z"); plain ``str(datetime)`` would yield a
+    space-separated string and ``isoformat()`` a "+00:00" offset.
+    """
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        text = isoformat()
+        return text[:-6] + "Z" if text.endswith("+00:00") else text
+    return str(value)
 
 
 class Services:
@@ -57,7 +73,7 @@ class Services:
         data = loader()
         try:
             ttl = max(self.settings.catalog_cache_seconds, 1)
-            self.redis.setex(cache_key, ttl, json.dumps(data, default=str))
+            self.redis.setex(cache_key, ttl, json.dumps(data, default=json_default))
         except Exception:
             pass
         return data
@@ -65,12 +81,33 @@ class Services:
     def cache_epg(self, channel_id: int, programmes: list[dict[str, Any]]) -> None:
         cache_key = f"{EPG_CACHE_PREFIX}channel:{channel_id}"
         try:
-            self.redis.setex(cache_key, EPG_CACHE_TTL, json.dumps(programmes, default=str))
+            self.redis.setex(cache_key, EPG_CACHE_TTL, json.dumps(programmes, default=json_default))
         except Exception:
             pass
 
     def get_cached_epg(self, channel_id: int) -> list[dict[str, Any]] | None:
         cache_key = f"{EPG_CACHE_PREFIX}channel:{channel_id}"
+        try:
+            raw = self.redis.get(cache_key)
+            if raw:
+                return json.loads(raw)
+        except Exception:
+            pass
+        return None
+
+    def cache_now_next(self, channel_id: int, payload: dict[str, Any]) -> None:
+        cache_key = f"{NOW_NEXT_CACHE_PREFIX}{channel_id}"
+        try:
+            self.redis.setex(
+                cache_key,
+                NOW_NEXT_CACHE_TTL,
+                json.dumps(payload, default=json_default),
+            )
+        except Exception:
+            pass
+
+    def get_cached_now_next(self, channel_id: int) -> dict[str, Any] | None:
+        cache_key = f"{NOW_NEXT_CACHE_PREFIX}{channel_id}"
         try:
             raw = self.redis.get(cache_key)
             if raw:
