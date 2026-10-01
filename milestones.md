@@ -132,6 +132,46 @@ The following authentication/authorization defects identified before M9 were rem
 **Live channel test scope (reversible):** new `TAVUNO_LIVE_CHANNEL_ALLOWLIST` / `TAVUNO_LIVE_CHANNEL_LIMIT` settings filter `/v1/channels` and `/v1/home` at read time (synced data untouched). `tavuno-control/scripts/find_working_channels.py` finds channels whose upstream really plays (playback answers `protocol: "http_hls"`) and writes the scope into `tavuno-infra/.env`. Currently scoped to **10 verified-working channels**; clear with `--clear` to restore all 2036. See `docs/Live_Channel_Test_Scope.md`.
 
 **Tests:** `TestLiveChannelTestScope` (8 cases) in `tests/test_catalog_service.py` (53 passed); `AuthorizationHeadersTest` on Android. Backend suite: 219 passed / 9 skipped with `AUTH_OPEN_ACCESS=false`.
+### OwnTV Parity Port — Slice A: Player ✅ COMPLETE (2026-10-01, commit 807a699)
+Source plan: `docs/OwnTV_Feature_Port_Plan.md`. OwnTV-Baseline's player is libmpv/FFmpeg, so
+player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verbatim.
+
+- **Zap engine.** `playback/LiveZapNavigator` + `core/LiveChannelQueue`: a browse screen arms the
+  exact list the viewer was scrolling; CH± and D-pad ▲▼ step it with wrap-around at both ends, and
+  every hop re-runs the same authorize effect the first tune uses (closing the session it replaces).
+  A single-channel tune (Sports) clears the list, so zapping degrades honestly instead of walking a
+  stale one. Live TV and Search both arm it, so a viewer can surf straight out of a search hit.
+- **Remote map.** Every "which key does what, in which state" decision lives in
+  `ui/screens/player/PlayerRemote.kt` (`resolvePlayerKey`), so it is unit-testable without a decoder:
+  media keys are global; an open channel list owns the D-pad; the first OK reveals the controls and
+  the second enters them; BACK is a ladder (list → controls → exit), never a stray exit from a stream.
+- **Layers.** `PlayerHud` — an auto-hiding control strip that replaced Media3's touch-first
+  `PlayerView` controller — and `PlayerChannelOverlay` (in-player channel list with now/next), both
+  drawn in the Tavuno design system. Guide data is decoration: playback never waits on it.
+
+### OwnTV Parity Port — Slice A2: Subtitles ✅ COMPLETE (2026-10-01)
+- **Text tracks start disabled.** Media3's `DefaultTrackSelector` auto-selects a caption track nobody
+  asked for; the player now disables `C.TRACK_TYPE_TEXT` at construction, so captions appear only when
+  the viewer asks for them.
+- **One key, one walk.** SUBTITLE/CAPTIONS (global, like the media rocker) or the HUD pill steps
+  `Off → track 1 → … → Off`, pinning the exact track with a `TrackSelectionOverride` — deterministic
+  even on a stream carrying several subtitle languages, and never dead-ending on the last track. The
+  HUD names the active track so a viewer who cycled past the wanted one can see where they landed.
+- **Decision layer.** `ui/screens/player/PlayerTracks.kt` holds the pure logic (`subtitleTrackInfos`,
+  `subtitleTrackLabel`, `nextSubtitleIndex`, `selectedSubtitleIndex`); "on/off" is *derived* from the
+  decoder's own `Tracks`, so the HUD can never claim a track is on that isn't.
+
+**Tests (Slices A + A2):** `LiveZapNavigatorTest` (12), `PlayerRemoteTest` (17), `PlayerTracksTest`
+(12), `AuthorizationHeadersTest` (3). Android suite: **65 passed / 0 failed**; `assembleDebug` clean.
+
+### OwnTV Parity Port — Slice B: Search ✅ COMPLETE (commit 8320ae1)
+- **Backend:** `GET /v1/search` — a case-insensitive `CatalogService.search()` across channels, movies
+  and series, returning grouped results and applying the same live-channel test scope as the other
+  catalog reads.
+- **Android:** a Search tab in the shell — a debounced field (focused on entry, system IME for input,
+  deliberately button-free) over three labelled result rows. Channel hits play immediately *and* arm
+  the zap list; movie/series hits push their detail routes.
+
 ## Incomplete Milestones
 
 ### M13 — Catch-up / DVR / Timeshift ⚠️ PARTIAL

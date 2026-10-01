@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Replay30
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,11 +59,15 @@ internal fun PlayerHud(
     isPlaying: Boolean,
     dvrEnabled: Boolean,
     canZap: Boolean,
+    canSelectSubtitles: Boolean,
+    subtitlesOn: Boolean,
+    activeSubtitleLabel: String?,
     onBack: () -> Unit,
     onTogglePlay: () -> Unit,
     onStep: (Int) -> Unit,
     onRewind: (Long) -> Unit,
     onOpenChannels: () -> Unit,
+    onToggleSubtitles: () -> Unit,
     firstControlFocus: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
@@ -92,11 +97,15 @@ internal fun PlayerHud(
             isPlaying = isPlaying,
             dvrEnabled = dvrEnabled,
             canZap = canZap,
+            canSelectSubtitles = canSelectSubtitles,
+            subtitlesOn = subtitlesOn,
+            activeSubtitleLabel = activeSubtitleLabel,
             onBack = onBack,
             onTogglePlay = onTogglePlay,
             onStep = onStep,
             onRewind = onRewind,
             onOpenChannels = onOpenChannels,
+            onToggleSubtitles = onToggleSubtitles,
             firstControlFocus = firstControlFocus,
         )
     }
@@ -161,11 +170,15 @@ private fun PlayerHudControls(
     isPlaying: Boolean,
     dvrEnabled: Boolean,
     canZap: Boolean,
+    canSelectSubtitles: Boolean,
+    subtitlesOn: Boolean,
+    activeSubtitleLabel: String?,
     onBack: () -> Unit,
     onTogglePlay: () -> Unit,
     onStep: (Int) -> Unit,
     onRewind: (Long) -> Unit,
     onOpenChannels: () -> Unit,
+    onToggleSubtitles: () -> Unit,
     firstControlFocus: FocusRequester,
 ) {
     val colors = TavunoTheme.colors
@@ -227,6 +240,17 @@ private fun PlayerHudControls(
                 )
             }
 
+            if (canSelectSubtitles) {
+                HudStepButton(
+                    label = if (subtitlesOn) "Subs on" else "Subs off",
+                    icon = Icons.Filled.Subtitles,
+                    onClick = onToggleSubtitles,
+                    // The pill carries the state: primary when captions are rendering, secondary
+                    // when the stream merely offers them.
+                    style = if (subtitlesOn) TavunoButtonStyle.PRIMARY else TavunoButtonStyle.SECONDARY,
+                )
+            }
+
             if (dvrEnabled) {
                 HudStepButton(
                     label = "−30s",
@@ -250,6 +274,20 @@ private fun PlayerHudControls(
             style = MaterialTheme.typography.labelSmall,
             color = colors.accentOnVideo.copy(alpha = 0.85f),
         )
+
+        if (canSelectSubtitles) {
+            Text(
+                // Names the track that is on, so a viewer who cycled past the one they wanted can see
+                // where they landed instead of waiting for a caption line to appear.
+                text = if (activeSubtitleLabel != null) {
+                    "Subtitles: $activeSubtitleLabel  •  SUBTITLE key to change"
+                } else {
+                    "SUBTITLE key turns subtitles on"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.accentOnVideo.copy(alpha = 0.85f),
+            )
+        }
     }
 }
 
@@ -259,11 +297,12 @@ private fun HudStepButton(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
+    style: TavunoButtonStyle = TavunoButtonStyle.SECONDARY,
 ) {
     TavunoButton(
         label = label,
         onClick = onClick,
-        style = TavunoButtonStyle.SECONDARY,
+        style = style,
         leading = { tint ->
             Icon(
                 imageVector = icon,

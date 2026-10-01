@@ -34,6 +34,9 @@ internal enum class PlayerKey {
     /** Media play/pause rocker: toggle. */
     PlayPause,
 
+    /** SUBTITLE / CAPTIONS key: Off → track 1 → … → track n → Off (see [PlayerTracks]). */
+    ToggleSubtitles,
+
     /** Leave the player (BACK with no overlay open). */
     Back,
 
@@ -50,12 +53,15 @@ internal enum class PlayerKey {
  * @param rootFocused D-pad focus is on the video surface itself, not on a HUD control. Only then may
  *   a key be swallowed; otherwise an `Ignore` must let Compose's focus system deliver it to the
  *   focused button, or OK would stop activating anything.
+ * @param canSelectSubtitles the tuned stream carries at least one usable text track. When it does
+ *   not, the SUBTITLE key falls through instead of being eaten by a no-op.
  */
 internal data class PlayerKeyContext(
     val hudVisible: Boolean,
     val channelListOpen: Boolean,
     val canZap: Boolean,
     val rootFocused: Boolean,
+    val canSelectSubtitles: Boolean = false,
 )
 
 /**
@@ -63,7 +69,9 @@ internal data class PlayerKeyContext(
  *
  * Design rules, in priority order:
  *  1. **Media keys are global.** A remote's play/pause/stop rocker must work whether or not the HUD
- *     happens to be up, so they resolve before any state check.
+ *     happens to be up, so they resolve before any state check. The SUBTITLE key rides with them,
+ *     for the same reason: a viewer reaching for it mid-stream should not have to raise the controls
+ *     first.
  *  2. **An open channel list owns the D-pad.** Its rows are focusable; UP/DOWN must move the cursor
  *     inside it, never zap underneath it.
  *  3. **One OK reveals the controls, a second OK enters them.** This is the behaviour every TV
@@ -81,6 +89,11 @@ internal fun resolvePlayerKey(keyCode: Int, context: PlayerKeyContext): PlayerKe
         KeyEvent.KEYCODE_MEDIA_PAUSE -> return PlayerKey.Pause
         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> return PlayerKey.PlayPause
         KeyEvent.KEYCODE_MEDIA_STOP -> return PlayerKey.Back
+
+        // SUBTITLE/CAPTIONS. Global like the rest of the media rocker, but only consumed when the
+        // stream actually carries a text track — otherwise it falls through instead of being eaten.
+        KeyEvent.KEYCODE_CAPTIONS ->
+            return if (context.canSelectSubtitles) PlayerKey.ToggleSubtitles else PlayerKey.Ignore
     }
 
     // 2. The channel list, when open, consumes the D-pad.

@@ -36,9 +36,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -80,6 +84,9 @@ private const val EPG_REFRESH_INTERVAL_MS = 60_000L
  *    ([PlayerRemote.kt]) so they are unit-testable; this file only applies the result.
  *  - **Layers.** A HUD control strip (auto-hide, OK-focusable) and an in-player channel list
  *    ([PlayerChannelOverlay]), on the BACK ladder: list → controls → exit.
+ *  - **Subtitles.** Text tracks start *disabled* (Media3 would otherwise auto-select one nobody asked
+ *    for); the SUBTITLE key or the HUD pill walks `Off → track 1 → … → Off`. The decisions live in
+ *    [PlayerTracks], so the walk is unit-testable without a decoder.
  *
  * Guide data ([ChannelNowNext]) is decoration: playback never waits on it.
  */
@@ -114,8 +121,19 @@ fun PlayerScreen(
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
-            .apply { setHandleAudioBecomingNoisy(true) }
+            .apply {
+                setHandleAudioBecomingNoisy(true)
+                // Subtitles start OFF. DefaultTrackSelector otherwise auto-selects a text track, so
+                // a viewer who never asked for captions gets them; the SUBTITLE key turns them on.
+                trackSelectionParameters = TrackSelectionParameters.Builder(context)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    .build()
+            }
     }
+
+    // The decoder's track tree, mirrored into state so the subtitle UI recomposes whenever a stream
+    // changes its tracks — every zap re-reads it from scratch.
+    var currentTracks by remember { mutableStateOf(exoPlayer.currentTracks) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -127,6 +145,10 @@ fun PlayerScreen(
 
             override fun onIsPlayingChanged(playingState: Boolean) {
                 isPlaying = playingState
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                currentTracks = tracks
             }
         }
         exoPlayer.addListener(listener)
@@ -175,6 +197,17 @@ fun PlayerScreen(
     }
     val canZap = isLive && navigator.canZap
     val playingChannelId = if (isLive) currentId.toIntOrNull() else null
+
+    // Subtitle state is derived from the decoder's own track tree, never remembered locally, so the
+    // HUD can never claim a track is on that isn't — including when a stream swaps tracks mid-play.
+    val subtitleTracks = remember(currentTracks) { subtitleTrackInfos(currentTracks) }
+    val canSelectSubtitles = subtitleTracks.isNotEmpty()
+    val subtitleChoiceCount = subtitleTracks.size + 1 // Off, then one entry per text track
+    val subtitleActiveIndex = remember(subtitleTracks) { selectedSubtitleIndex(subtitleTracks) }
+    val activeSubtitleLabel = remember(subtitleTracks, subtitleActiveIndex) {
+        subtitleTracks.getOrNull(subtitleActiveIndex - 1)
+            ?.let { subtitleTrackLabel(it.label, it.language, "Track") }
+    }
 
     // Overlay state, declared before the effects that key off it.
     // hudVisible: the control strip is up. channelListOpen: the in-player list owns the D-pad.
@@ -313,6 +346,32 @@ fun PlayerScreen(
         runCatching { rootFocus.requestFocus() }
     }
 
+    /**
+     * Turn a choice index into decoder state. [SUBTITLE_OFF_INDEX] disables text outright; any other
+     * index pins that exact track with an override, which is what makes the walk deterministic on a
+     * stream that carries several subtitle languages.
+     */
+    fun selectSubtitle(index: Int) {
+        val builder = exoPlayer.trackSelectionParameters.buildUpon()
+        if (index <= SUBTITLE_OFF_INDEX) {
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            builder.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+        } else {
+            val info = subtitleTracks.getOrNull(index - 1) ?: return
+            val group = currentTracks.groups.getOrNull(info.groupIndex) ?: return
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            builder.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, info.trackIndex))
+        }
+        exoPlayer.trackSelectionParameters = builder.build()
+    }
+
+    /** One SUBTITLE press: Off → track 1 → … → track n → Off (see [nextSubtitleIndex]). */
+    fun toggleSubtitles() {
+        if (canSelectSubtitles) {
+            selectSubtitle(nextSubtitleIndex(subtitleActiveIndex, subtitleChoiceCount))
+        }
+    }
+
     /** Apply a resolved key. Returns true when the press was consumed by the player. */
     fun applyPlayerKey(key: PlayerKey): Boolean = when (key) {
         PlayerKey.PrevChannel -> { zapBy(-1); true }
@@ -327,6 +386,7 @@ fun PlayerScreen(
             if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
             true
         }
+        PlayerKey.ToggleSubtitles -> { toggleSubtitles(); true }
         PlayerKey.Back -> { onNavigateBack(); true }
         PlayerKey.Ignore -> false
     }
@@ -349,6 +409,7 @@ fun PlayerScreen(
                         channelListOpen = channelListOpen,
                         canZap = canZap,
                         rootFocused = rootFocused,
+                        canSelectSubtitles = canSelectSubtitles,
                     ),
                 )
                 // A held channel key surfs the list; every other action fires once per press.
@@ -423,6 +484,9 @@ fun PlayerScreen(
                         isPlaying = isPlaying,
                         dvrEnabled = isLive && dvrEnabled && maxRewindSeconds > 0,
                         canZap = canZap,
+                        canSelectSubtitles = canSelectSubtitles,
+                        subtitlesOn = subtitleActiveIndex > SUBTITLE_OFF_INDEX,
+                        activeSubtitleLabel = activeSubtitleLabel,
                         onBack = onNavigateBack,
                         onTogglePlay = {
                             if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
@@ -432,6 +496,7 @@ fun PlayerScreen(
                             exoPlayer.seekTo((exoPlayer.currentPosition - millis).coerceAtLeast(0L))
                         },
                         onOpenChannels = { channelListOpen = true },
+                        onToggleSubtitles = { toggleSubtitles() },
                         firstControlFocus = hudFocus,
                     )
                 }

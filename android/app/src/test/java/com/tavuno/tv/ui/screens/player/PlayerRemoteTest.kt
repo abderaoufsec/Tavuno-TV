@@ -17,11 +17,13 @@ class PlayerRemoteTest {
         channelListOpen: Boolean = false,
         canZap: Boolean = true,
         rootFocused: Boolean = true,
+        canSelectSubtitles: Boolean = false,
     ) = PlayerKeyContext(
         hudVisible = hudVisible,
         channelListOpen = channelListOpen,
         canZap = canZap,
         rootFocused = rootFocused,
+        canSelectSubtitles = canSelectSubtitles,
     )
 
     private fun resolve(keyCode: Int, ctx: PlayerKeyContext = context()) =
@@ -86,6 +88,44 @@ class PlayerRemoteTest {
     }
 
     // __PLAYER_REMOTE_TESTS__
+
+    // --- 1b. The SUBTITLE / CAPTIONS key ----------------------------------------------
+
+    @Test
+    fun `subtitle key toggles when the stream carries a text track`() {
+        assertEquals(
+            PlayerKey.ToggleSubtitles,
+            resolve(KeyEvent.KEYCODE_CAPTIONS, context(canSelectSubtitles = true)),
+        )
+    }
+
+    @Test
+    fun `subtitle key falls through when there is nothing to select`() {
+        assertEquals(
+            PlayerKey.Ignore,
+            resolve(KeyEvent.KEYCODE_CAPTIONS, context(canSelectSubtitles = false)),
+        )
+    }
+
+    @Test
+    fun `subtitle key is global like the rest of the media rocker`() {
+        // Reachable mid-stream, with the controls up, with the channel list open, and off the root.
+        for (ctx in listOf(
+            context(canSelectSubtitles = true),
+            context(canSelectSubtitles = true, hudVisible = true),
+            context(canSelectSubtitles = true, channelListOpen = true),
+            context(canSelectSubtitles = true, rootFocused = false),
+        )) {
+            assertEquals(PlayerKey.ToggleSubtitles, resolve(KeyEvent.KEYCODE_CAPTIONS, ctx))
+        }
+    }
+
+    @Test
+    fun `subtitle key leaves the surf and back behaviour alone`() {
+        val subtitles = context(canSelectSubtitles = true)
+        assertEquals(PlayerKey.PrevChannel, resolve(KeyEvent.KEYCODE_DPAD_UP, subtitles))
+        assertEquals(PlayerKey.Back, resolve(KeyEvent.KEYCODE_BACK, subtitles))
+    }
 
     // --- 4. The dedicated channel rocker ----------------------------------------------
 
