@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.tavuno.tv.core.AppModule
+import com.tavuno.tv.ui.screens.guide.GuideScreen
 import com.tavuno.tv.ui.screens.home.HomeScreen
 import com.tavuno.tv.ui.screens.live.LiveTvScreen
 import com.tavuno.tv.ui.screens.movies.MoviesScreen
@@ -57,6 +58,11 @@ fun TavunoMainScreen(
             )
 
             TavunoTab.LIVE -> LiveTvScreen(
+                catalogRepository = AppModule.catalogRepository,
+                onNavigateToPlayer = { channelId -> onNavigateToPlayer("live", channelId) },
+            )
+
+            TavunoTab.GUIDE -> GuideScreen(
                 catalogRepository = AppModule.catalogRepository,
                 onNavigateToPlayer = { channelId -> onNavigateToPlayer("live", channelId) },
             )

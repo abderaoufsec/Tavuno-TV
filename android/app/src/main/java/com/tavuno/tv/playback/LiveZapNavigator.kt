@@ -1,6 +1,7 @@
 package com.tavuno.tv.playback
 
 import com.tavuno.tv.data.model.Channel
+import com.tavuno.tv.data.model.GuideChannel
 
 /**
  * The channel list the player zaps within — CH+/CH−, the D-pad surf keys and the in-player
@@ -24,6 +25,14 @@ data class ZapChannel(
 
 /** Map a catalog channel onto its zap-list entry. */
 fun Channel.toZapChannel(): ZapChannel = ZapChannel(id = id, name = name, logoUrl = logo)
+
+/**
+ * Same mapping for a guide row (Slice C).
+ *
+ * The guide never loads the catalog list, so tuning from it has to map its own channel
+ * shape; without this the player would get an empty zap list and CH+/- would dead-end.
+ */
+fun GuideChannel.toZapChannel(): ZapChannel = ZapChannel(id = id, name = name, logoUrl = logo)
 
 /**
  * Compute the next index for a CH+/CH− delta within a bounded zap list.

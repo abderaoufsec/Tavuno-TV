@@ -95,6 +95,23 @@ interface TavunoApiService {
     
     @GET("v1/epg/channel/{channel_id}/now-next")
     suspend fun getChannelNowNext(@Path("channel_id") channelId: Int): Response<ChannelNowNext>
+
+    /**
+     * One request for the whole guide grid (Slice C).
+     *
+     * The grid needs every channel's programmes for the same window; asking
+     * `/v1/epg?channel_id=` per row would be one round trip per channel. `channel_ids`
+     * is null for "every channel the live scope allows", and the backend caps the
+     * channel count itself, so the client never paginates the grid.
+     */
+    @GET("v1/epg/window")
+    suspend fun getEpgWindow(
+        @Query("start") start: String,
+        @Query("end") end: String,
+        @Query("channel_ids") channelIds: List<Int>?,
+        @Query("category_id") categoryId: Int?,
+        @Query("limit") limit: Int?
+    ): Response<EpgWindow>
     
     // Playback
     @POST("v1/playback/live/{channel_id}")

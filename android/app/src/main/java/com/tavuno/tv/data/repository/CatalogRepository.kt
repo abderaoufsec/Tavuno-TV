@@ -5,6 +5,8 @@ import com.tavuno.tv.data.local.SessionManager
 import com.tavuno.tv.data.model.*
 import com.tavuno.tv.network.NetworkModule
 import kotlinx.coroutines.flow.first
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 
 class CatalogRepository(
     private val apiService: TavunoApiService,
@@ -213,4 +215,40 @@ class CatalogRepository(
             Result.failure(e)
         }
     }
+
+    /**
+     * The whole guide grid for one time window (Slice C).
+     *
+     * One request answers the screen — the alternative, one `getChannelNowNext` per row,
+     * is hundreds of round trips for the same data. Instants are serialized as ISO-8601 UTC
+     * (`...Z`), the exact shape `parse_timestamp` and every other Tavuno endpoint uses.
+     */
+    suspend fun getEpgWindow(
+        windowStart: Instant,
+        windowEnd: Instant,
+        channelIds: List<Int>? = null,
+        categoryId: Int? = null,
+        limit: Int? = null
+    ): Result<EpgWindow> {
+        return try {
+            ensureAuthToken()
+            val response = apiService.getEpgWindow(
+                start = isoTimestamp(windowStart),
+                end = isoTimestamp(windowEnd),
+                channelIds = channelIds,
+                categoryId = categoryId,
+                limit = limit
+            )
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception(catalogError(response.code(), "the program guide")))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** ISO-8601 UTC (`2026-10-01T14:00:00Z`) — never a local offset, which `+` would break in a query string. */
+    private fun isoTimestamp(instant: Instant): String = DateTimeFormatter.ISO_INSTANT.format(instant)
 }
