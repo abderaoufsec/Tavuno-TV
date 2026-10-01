@@ -47,11 +47,6 @@ fun TavunoNavigation(
         composable(Screen.Splash.route) {
             SplashScreen(
                 sessionManager = com.tavuno.tv.core.AppModule.sessionManager,
-                onNavigateToLogin = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
-                    }
-                },
                 onNavigateToHome = {
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
@@ -60,6 +55,8 @@ fun TavunoNavigation(
             )
         }
 
+        // Login stays registered but is not routed to during free launch
+        // (AUTH_OPEN_ACCESS); re-enable by navigating here from splash/logout.
         composable(Screen.Login.route) {
             LoginScreen(
                 authRepository = com.tavuno.tv.core.AppModule.authRepository,
@@ -83,7 +80,10 @@ fun TavunoNavigation(
                     navController.navigate(Screen.Player.route + "/$type/$id")
                 },
                 onLogout = {
-                    navController.navigate(Screen.Login.route) {
+                    // Free launch has no login screen to fall back to:
+                    // drop the cached token and rebuild the shell as guest.
+                    com.tavuno.tv.network.NetworkModule.updateAuthToken(null)
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Main.route) { inclusive = true }
                     }
                 }

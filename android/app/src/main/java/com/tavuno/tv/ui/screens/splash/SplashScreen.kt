@@ -20,18 +20,16 @@ import com.tavuno.tv.network.NetworkModule
 @Composable
 fun SplashScreen(
     sessionManager: com.tavuno.tv.data.local.SessionManager,
-    onNavigateToLogin: () -> Unit,
     onNavigateToHome: () -> Unit
 ) {
     LaunchedEffect(Unit) {
         delay(400)
+        // Open access (free launch): no login gate. Seed a cached token when
+        // one exists so logged-in users keep their identity; otherwise the
+        // backend resolves the anonymous guest.
         val token = sessionManager.accessToken.first()
         NetworkModule.updateAuthToken(token)
-        if (token != null) {
-            onNavigateToHome()
-        } else {
-            onNavigateToLogin()
-        }
+        onNavigateToHome()
     }
     
     Box(
