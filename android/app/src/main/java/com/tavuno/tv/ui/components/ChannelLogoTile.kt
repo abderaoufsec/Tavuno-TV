@@ -2,6 +2,7 @@ package com.tavuno.tv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +24,7 @@ import com.tavuno.tv.ui.theme.Dimens
 import com.tavuno.tv.ui.theme.TavunoTheme
 
 /**
- * A square channel tile for the Live TV list, ported from the OwnTV-Baseline design system.
+ * A square channel tile for the Live TV grid, ported from the OwnTV-Baseline design system.
  *
  * The logo is drawn on a light plate (channel logos are almost always dark-on-transparent artwork,
  * so they need a bright backing to read on a dark TV surface). When [logoUrl] is missing the
@@ -52,34 +53,11 @@ fun ChannelLogoTile(
         contentAlignment = Alignment.TopStart,
     ) { focused ->
         Column(modifier = Modifier.padding(Dimens.PosterPadding)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(Dimens.PosterArtCorner))
-                    .background(colors.surfaceContainerHighest),
-                contentAlignment = Alignment.Center,
+            ChannelLogoPlate(
+                channelName = channelName,
+                logoUrl = logoUrl,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
             ) {
-                if (logoUrl.isNullOrBlank()) {
-                    Text(
-                        text = initialsOf(channelName),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = colors.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                } else {
-                    AsyncImage(
-                        model = logoUrl,
-                        contentDescription = channelName,
-                        // Logos are usually transparent PNGs: FIT keeps the whole mark visible
-                        // instead of cropping it.
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(Dimens.GapSmall),
-                    )
-                }
                 if (channelNumber != null) {
                     Box(
                         modifier = Modifier
@@ -107,6 +85,48 @@ fun ChannelLogoTile(
                 modifier = Modifier.padding(top = Dimens.GapSmall, start = 2.dp, end = 2.dp),
             )
         }
+    }
+}
+
+/**
+ * The square logo plate shared by [ChannelLogoTile] and list-style channel rows: artwork (or an
+ * initials fallback) on a bright backing, with an optional overlay [content] slot for badges.
+ */
+@Composable
+fun ChannelLogoPlate(
+    channelName: String,
+    logoUrl: String?,
+    modifier: Modifier = Modifier,
+    content: (@Composable BoxScope.() -> Unit)? = null,
+) {
+    val colors = TavunoTheme.colors
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(Dimens.PosterArtCorner))
+            .background(colors.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (logoUrl.isNullOrBlank()) {
+            Text(
+                text = initialsOf(channelName),
+                style = MaterialTheme.typography.titleLarge,
+                color = colors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            AsyncImage(
+                model = logoUrl,
+                contentDescription = channelName,
+                // Logos are usually transparent PNGs: FIT keeps the whole mark visible
+                // instead of cropping it.
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(Dimens.GapSmall),
+            )
+        }
+        content?.invoke(this)
     }
 }
 

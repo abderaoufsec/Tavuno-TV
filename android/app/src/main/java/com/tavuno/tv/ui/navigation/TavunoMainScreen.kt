@@ -57,13 +57,11 @@ fun TavunoMainScreen(
 
             TavunoTab.LIVE -> LiveTvScreen(
                 catalogRepository = AppModule.catalogRepository,
-                onNavigateBack = { tab = TavunoTab.HOME },
                 onNavigateToPlayer = { channelId -> onNavigateToPlayer("live", channelId) },
             )
 
             TavunoTab.SPORTS -> SportsScreen(
                 sportsRepository = AppModule.sportsRepository,
-                onNavigateBack = { tab = TavunoTab.HOME },
                 onNavigateToPlayer = { channelId -> onNavigateToPlayer("live", channelId) },
             )
 
