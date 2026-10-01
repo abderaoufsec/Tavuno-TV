@@ -113,6 +113,36 @@ interface TavunoApiService {
         @Query("limit") limit: Int?
     ): Response<EpgWindow>
     
+    // Customization (Slice D). A PUT is a full replace for one kind — the client sends the
+    // complete list it just rendered, which is what makes "un-pin" expressible.
+    @GET("v1/customize/{kind}")
+    suspend fun getCustomizations(@Path("kind") kind: String): Response<CustomizationSet>
+
+    @PUT("v1/customize/{kind}")
+    suspend fun putCustomizations(
+        @Path("kind") kind: String,
+        @Body payload: CustomizationPayload
+    ): Response<CustomizationSet>
+
+    @DELETE("v1/customize/{kind}")
+    suspend fun deleteCustomizations(@Path("kind") kind: String): Response<CustomizationReset>
+
+    // Profiles (Slice D)
+    @GET("v1/profiles")
+    suspend fun getProfiles(): Response<List<ViewingProfile>>
+
+    @POST("v1/profiles")
+    suspend fun createProfile(@Body request: CreateProfileRequest): Response<ViewingProfile>
+
+    @PATCH("v1/profiles/{profile_id}")
+    suspend fun updateProfile(
+        @Path("profile_id") profileId: Int,
+        @Body request: UpdateProfileRequest
+    ): Response<ViewingProfile>
+
+    @DELETE("v1/profiles/{profile_id}")
+    suspend fun deleteProfile(@Path("profile_id") profileId: Int): Response<DeleteProfileResult>
+
     // Playback
     @POST("v1/playback/live/{channel_id}")
     suspend fun authorizeLivePlayback(

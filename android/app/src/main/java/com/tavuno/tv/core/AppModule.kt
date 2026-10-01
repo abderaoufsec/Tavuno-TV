@@ -5,7 +5,9 @@ import com.tavuno.tv.data.api.TavunoApiService
 import com.tavuno.tv.data.local.SessionManager
 import com.tavuno.tv.data.repository.AuthRepository
 import com.tavuno.tv.data.repository.CatalogRepository
+import com.tavuno.tv.data.repository.CustomizeRepository
 import com.tavuno.tv.data.repository.PlaybackRepository
+import com.tavuno.tv.data.repository.ProfileRepository
 import com.tavuno.tv.data.repository.SportsRepository
 import com.tavuno.tv.network.NetworkModule
 
@@ -35,5 +37,13 @@ object AppModule {
     
     val playbackRepository: PlaybackRepository by lazy {
         PlaybackRepository(NetworkModule.apiService, sessionManager)
+    }
+
+    val customizeRepository: CustomizeRepository by lazy {
+        CustomizeRepository(NetworkModule.apiService, sessionManager)
+    }
+
+    val profileRepository: ProfileRepository by lazy {
+        ProfileRepository(NetworkModule.apiService, sessionManager)
     }
 }

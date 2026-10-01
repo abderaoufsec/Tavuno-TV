@@ -16,9 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Reorder
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +52,9 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     authRepository: com.tavuno.tv.data.repository.AuthRepository,
     onNavigateBack: () -> Unit,
+    onOpenProfiles: () -> Unit = {},
+    onOpenCustomizeChannels: () -> Unit = {},
+    onOpenCustomizeCategories: () -> Unit = {},
     onLogout: () -> Unit,
 ) {
     val colors = TavunoTheme.colors
@@ -76,6 +82,30 @@ fun SettingsScreen(
 
         item(key = "account") {
             SettingsRow("Account", "Manage your account", Icons.Filled.Person) { /* placeholder */ }
+        }
+        item(key = "profiles") {
+            SettingsRow(
+                title = "Who's watching?",
+                subtitle = "Add and manage profiles for everyone on this account",
+                icon = Icons.Filled.People,
+                onClick = onOpenProfiles,
+            )
+        }
+        item(key = "customize-channels") {
+            SettingsRow(
+                title = "Customize channels",
+                subtitle = "Reorder and hide live channels for this profile",
+                icon = Icons.Filled.Reorder,
+                onClick = onOpenCustomizeChannels,
+            )
+        }
+        item(key = "customize-categories") {
+            SettingsRow(
+                title = "Customize categories",
+                subtitle = "Reorder and hide rails for this profile",
+                icon = Icons.Filled.Category,
+                onClick = onOpenCustomizeCategories,
+            )
         }
         item(key = "playback") {
             SettingsRow("Playback", "Playback preferences", Icons.Filled.PlayArrow) { /* placeholder */ }
