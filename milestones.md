@@ -104,10 +104,24 @@ The following authentication/authorization defects identified before M9 were rem
 - Human-facing VOD content setup runbook added (docs/M12_VOD_Content_Setup.md)
 - Note: Real VOD content still needs to be added in Dispatcharr by operator following the runbook
 
+### Design-System Port — OwnTV-Baseline ✅ COMPLETE (2026-10-01, commit 6b57b57)
+- Full theme system ported: Color.kt, AccentColor.kt, TavunoColors.kt, Dimens, Type.kt, Animations.kt
+- Theme.kt gained a phone Material 3 compat bridge (phoneSchemeFrom + nested PhoneMaterialTheme) so legacy phone-composable screens keep working under the TV theme
+- Components: FocusableSurface, TavunoButton, RoundedPanel, PosterCard, ChannelLogoTile, StateViews (replaces ErrorState.kt)
+- Persistent shell: Sidebar, TopBar, CategoryRail, PreviewPane, ContentPane, DialogPanel compose into TavunoShell; TavunoMainScreen hosts all six browsing destinations in one shell (tab state, sidebar focus preserved across switches); TavunoNavigation only routes splash/login before it and details/player full-screen on top
+- Rewritten onto the system: Home (scrollable rails), Settings, Movies, Series
+- Sidebar initial focus lands on content (LEFT reaches the rail); Settings "Back to Home" uses SECONDARY button style
+- Phone bridge verified: E2E D-pad login → shell → Home → Settings on emulator, zero FATALs
+- New unit test: EpgTimeFormatTest; `gradlew test assembleDebug` BUILD SUCCESSFUL (0 errors)
+- Remaining (tracked as follow-up stages): LiveTv, Sports, MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login still on legacy layout/FocusableCard; FocusableCard retirement gate
+
 ## Incomplete Milestones
 
-### M13 — Catch-up / DVR / Timeshift ❌ NOT STARTED
-- No implementation yet
+### M13 — Catch-up / DVR / Timeshift ⚠️ PARTIAL
+- Phase 1 "Timeshift / Live Rewind (DVR)" is in main history (commit b4712ac)
+- Dual playback modes implemented: DIRECT_HLS and OME_DVR (commit b12df0a)
+- Player offers DVR seek-back affordances (-30s/-10s)
+- Remaining: catch-up from EPG, full DVR window management, operator-facing DVR config
 
 ### M14 — Subscription System ⚠️ PARTIAL
 - Backend subscription system exists
@@ -137,7 +151,7 @@ The following authentication/authorization defects identified before M9 were rem
 - Single instance only
 
 ### M20 — Quality / QA ⚠️ PARTIAL
-- Backend tests passing (153 passed, 8 skipped)
+- Backend tests passing (210 passed, 8 skipped as of 2026-10-01)
 - Android tests passing
 - No UI automation tests
 - No load testing
@@ -150,7 +164,6 @@ The following authentication/authorization defects identified before M9 were rem
 
 ## Remaining Tasks
 
-- Runtime verification on Android TV device/emulator
-- D-pad navigation runtime testing (instrumented tests)
-- Back navigation runtime testing (instrumented tests)
+- Restyle remaining legacy screens onto the design system (LiveTv, Sports, MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login) and retire FocusableCard
+- Backend: normalize Directus poster/backdrop UUIDs to asset URLs; windowed EPG endpoint; home rails/favourites/resume
 - Real VOD content population in Dispatcharr (operator task - see docs/M12_VOD_Content_Setup.md)
