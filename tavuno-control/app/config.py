@@ -1,6 +1,23 @@
 from functools import lru_cache
-from pydantic import Field
+import logging
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger("tavuno-control.config")
+
+# Secrets that ship with working defaults so a fresh clone runs without setup.
+# Each is a published constant, so its value outside development is a real
+# exposure rather than a cosmetic one. Checked at startup so an operator finds
+# out from the log rather than from an incident.
+_INSECURE_DEFAULT_SECRETS: dict[str, str] = {
+    "jwt_secret": "tavuno-jwt-secret-key-change-in-production",
+    "playback_token_secret": "tavuno-playback-secret-key",
+    "ops_token": "tavuno-ops-local",
+    "ome_api_token": "tavuno-m1-local",
+}
+
+# Environments where the defaults are expected and correct.
+_DEV_ENVIRONMENTS = {"development", "dev", "local", "test"}
 
 
 class Settings(BaseSettings):
@@ -98,6 +115,27 @@ class Settings(BaseSettings):
     # clone has a usable dashboard, and the header is compared in constant time
     # (hmac.compare_digest) so it cannot be probed byte by byte.
     ops_token: str = Field(default="tavuno-ops-local", validation_alias="TAVUNO_OPS_TOKEN")
+
+    @model_validator(mode="after")
+    def _warn_on_default_secrets(self) -> "Settings":
+        """Warn loudly when a published default secret is live outside development.
+
+        Deliberately a warning, not an error: refusing to start would turn a
+        configuration smell into an outage, and the stack has to be able to
+        come up for an operator to read the log that tells them what to fix.
+        """
+        if (self.environment or "").strip().lower() in _DEV_ENVIRONMENTS:
+            return self
+        for field_name, default in _INSECURE_DEFAULT_SECRETS.items():
+            if getattr(self, field_name, None) == default:
+                logger.warning(
+                    "SECURITY: %s is still the built-in default in a non-development "
+                    "environment (%s). Set it from the environment before exposing this "
+                    "service.",
+                    field_name.upper(),
+                    self.environment,
+                )
+        return self
 
     @property
     def postgres_dsn(self) -> str:

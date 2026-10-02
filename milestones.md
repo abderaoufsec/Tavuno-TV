@@ -299,6 +299,42 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
   passed / 13 skipped**.
 - **Docs:** `docs/M16_Monitoring.md`.
 
+### M17 — Security Hardening ✅ COMPLETE (2026-10-02)
+- **TLS added.** The proxy served cleartext only; Caddy now terminates TLS
+  (`tls internal`, Caddy's own CA — no domain needed) and `:80` exists purely to
+  redirect. Verified: 301 → `https://localhost:8443/...`, followed to a 200,
+  certificate issued by `CN=Caddy Local Authority - ECC Intermediate`. Switching
+  to Let's Encrypt is one edit, documented in the Caddyfile and
+  `docs/M17_Security_Hardening.md`.
+- **Two Caddy subtleties found by testing, not assumed.** (a) Automatic HTTPS
+  adds its own redirect using Caddy's internal port 443, which beat the explicit
+  `:80` block and sent clients to a dead port — disabled with
+  `auto_https disable_redirects`. (b) `{host}` already carries the request port,
+  so `https://{host}:8443` rendered as an invalid double-port URL and was
+  sanitised down to port 443; the redirect host is now explicit.
+- **Unmatched paths no longer answer 200.** Every unproxied path used to return
+  an empty `200`, which reads as success to a monitor and tells a scanner
+  nothing. An explicit catch-all refuses them: `/v1/ops` and `/metrics` are now
+  **404** through the proxy (verified) rather than accidentally reachable.
+- **Security headers:** `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, `Server` suppressed.
+- **Startup warning on published default secrets** (`app/config.py`):
+  `JWT_SECRET`, `PLAYBACK_TOKEN_SECRET`, `OPS_TOKEN`, `OME_API_TOKEN` are warned
+  about outside development. Warns rather than raises — refusing to boot would
+  turn a config smell into an outage and hide the log explaining it.
+- **Already in place and verified:** bcrypt hashing, HS256 JWT (access 15m,
+  refresh 30d), refresh rotation with a Redis JTI denylist and replay detection,
+  120s playback tokens with `hmac.compare_digest`, login rate limiting
+  (10/min per hashed email+IP), device limits and revocation.
+- **Deferred, with reasons** (documented in full): no login in the shipped
+  free-launch build (`AUTH_OPEN_ACCESS=true` — product decision; loopback bind is
+  the only boundary), `service.py:309` password reset does not denylist refresh
+  tokens, SMTP unimplemented, rate limiting is login-only and fails open on Redis
+  errors, playback tokens not enforced at the proxy, and **no independent review
+  — this is a self-assessment, not a penetration test**.
+- **Tests:** `tests/test_config_secrets.py` (7 cases). Suite: **414 passed / 13 skipped**.
+- **Docs:** `docs/M17_Security_Hardening.md`.
+
 ## Incomplete Milestones
 
 ### M13 — Catch-up / DVR / Timeshift ⚠️ PARTIAL
@@ -312,12 +348,6 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 - Plan management exists
 - No production billing integration
 
-### M17 — Security Hardening ⚠️ PARTIAL
-- HTTPS needs production configuration
-- Rate limiting exists
-- RBAC exists
-- No security audit performed
-
 ### M18 — Production Architecture ❌ NOT STARTED
 - Only localhost development environment
 
@@ -325,7 +355,7 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 - Single instance only
 
 ### M20 — Quality / QA ⚠️ PARTIAL
-- Backend tests passing (368 passed, 13 skipped on the host as of 2026-10-02; 372 passed, 9 skipped in-container against a live Postgres DSN)
+- Backend tests passing (414 passed, 13 skipped on the host as of 2026-10-02 with the monitoring, ops and config suites added; 386 passed, 14 skipped in-container)
 - Android tests passing (93 tests, 12 suites)
 - No UI automation tests
 - No load testing
@@ -338,9 +368,26 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 
 ## Remaining Tasks
 
-- Restyle remaining legacy screens onto the design system (MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login) and retire FocusableCard
-- Backend: normalize Directus poster/backdrop UUIDs to asset URLs; home rails/favourites/resume
+- **M13 catch-up (next up).** DVR-window catch-up: port `CatchupContinue` /
+  `CatchupJumpDialog` from `OwnTV-Baseline` (source at
+  `C:\Users\benab\CyberLab\OwnTV-Baseline\OwnTV\app\src\main\java\tv\own\owntv\features\live\`),
+  rebuild the dialog on Tavuno's components rather than copying it, and add
+  EPG-driven watch-from-start inside the existing OME DVR window. No new
+  recording infrastructure.
+- **M14 is deferred by decision, not blocked.** Free launch means no billing;
+  `AUTH_OPEN_ACCESS` already bypasses entitlement checks in `playback.py`.
+- Retire `FocusableCard`: still used by `SeriesDetailsScreen` and
+  `SeasonEpisodesScreen`. Move the remaining legacy screens onto the design
+  system (MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login).
+- D-pad regression tests: `DPadNavigationTest.kt` / `DvrRewindTest.kt` currently
+  only compile. The custom `onPreviewKeyEvent` handling means Compose's
+  `performKeyPress` reaches the field before the IME, so "does DOWN escape the
+  search field" is testable — unlike the real remote path.
+- Backend: normalize Directus poster/backdrop UUIDs to asset URLs; home
+  rails/favourites/resume.
 - Real VOD content population in Dispatcharr (operator task - see docs/M12_VOD_Content_Setup.md)
+- Rotate the four default secrets before any public exposure (see
+  `docs/M17_Security_Hardening.md`).
 
 ## Known Issues
 

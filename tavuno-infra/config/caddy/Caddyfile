@@ -1,18 +1,91 @@
+# Tavuno reverse proxy (M6 routing, M17 transport security).
+#
+# ---------------------------------------------------------------------------
+# Enabling real HTTPS
+# ---------------------------------------------------------------------------
+# `tls internal` below issues certificates from Caddy's own CA, so the
+# browser/`curl` will warn until that CA is trusted (curl: use `-k`). It needs
+# no domain and no internet access, which is the point for a local launch.
+#
+# When a real domain exists, ONE edit is needed — delete the `tls internal`
+# line and put the domain in the site address:
+#
+#     https://tavuno.example.com {
+#         # tls internal          <-- delete this line
+#         handle_path /api/* { ... }
+#     }
+#
+# Caddy then provisions a Let's Encrypt certificate automatically and renews
+# it. Add `header Strict-Transport-Security "max-age=31536000" { }` at the
+# same time: HSTS is deliberately absent here because browsers do not honour
+# it from an untrusted certificate, and setting it against the internal CA
+# risks pinning `localhost` to HTTPS before you are ready for it.
+# ---------------------------------------------------------------------------
+
+# Caddy's automatic HTTPS would normally add its own HTTP->HTTPS redirect for
+# the TLS site below. That redirect uses Caddy's *internal* HTTPS port (443),
+# but this container is published as 8443 on the host — so the auto-generated
+# redirect sent clients to https://localhost (port 443, nothing listening) and
+# silently beat the explicit :80 block further down. Disabling it makes the
+# :80 block below the only handler for plain HTTP.
+{
+	auto_https disable_redirects
+}
+
+# Plain HTTP exists only to redirect. Nothing is served over HTTP.
 :80 {
-    handle_path /api/* {
-        reverse_proxy tavuno-control:8000
-    }
+	# Hardcoded rather than built from {host}: Caddy's {host} already carries
+	# the request's port, so `https://{host}:8443` renders as
+	# `https://localhost:8080:8443` — invalid, and silently sanitised down to
+	# `https://localhost` (wrong port 443, connection refused). The host is
+	# fixed here anyway because this is the local entry point.
+	#
+	# When a real domain is configured, delete this whole :80 block: with a
+	# real domain Caddy issues the certificate itself and performs the
+	# HTTP->HTTPS redirect automatically (see the top of this file).
+	redir https://localhost:8443{uri} permanent
+}
 
-    handle_path /directus/* {
-        reverse_proxy directus:8055
-    }
+https://localhost {
+	tls internal
 
-    handle_path /media/* {
-        # Media streaming proxy (M6)
-        # Token verification is done via /v1/media/verify endpoint before accessing streams
-        # Full token enforcement at proxy level requires additional Caddy modules or OME config
-        reverse_proxy tavuno-ovenmediaengine:3333
-    }
+	# Defence in depth on the TLS site only. HSTS is intentionally omitted —
+	# see the note at the top of this file.
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
 
-    respond / "Tavuno TV M1 reverse proxy is running" 200
+	# handle blocks are mutually exclusive, so exactly one of these runs per
+	# request and the bare `handle` at the bottom is the catch-all.
+	handle_path /api/* {
+		reverse_proxy tavuno-control:8000
+	}
+
+	handle_path /directus/* {
+		reverse_proxy directus:8055
+	}
+
+	handle_path /media/* {
+		# Media streaming proxy (M6)
+		# Token verification is done via /v1/media/verify endpoint before accessing streams
+		# Full token enforcement at proxy level requires additional Caddy modules or OME config
+		reverse_proxy tavuno-ovenmediaengine:3333
+	}
+
+	handle / {
+		respond "Tavuno TV reverse proxy is running" 200
+	}
+
+	# Catch-all. Without this, a request matching no handler above gets an
+	# empty 200 — which reads as success to a monitor and tells a scanner
+	# nothing. It is also what keeps /v1/ops and /metrics genuinely
+	# unreachable from this entry point: they are not proxied, they are
+	# refused, and nothing but the three prefixes above ever reaches a
+	# backend. Both bind to loopback on tavuno-control and are reached
+	# directly, never through here.
+	handle {
+		respond "Not found" 404
+	}
 }

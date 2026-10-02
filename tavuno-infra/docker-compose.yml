@@ -366,7 +366,11 @@ services:
     restart: unless-stopped
 
     ports:
+      # HTTP exists only to redirect to HTTPS (M17).
       - "127.0.0.1:8080:80"
+      # TLS with Caddy's internal CA; the Caddyfile listens on 443 and
+      # redirects the plain-HTTP listener to this port.
+      - "127.0.0.1:8443:443"
 
     depends_on:
       directus:
