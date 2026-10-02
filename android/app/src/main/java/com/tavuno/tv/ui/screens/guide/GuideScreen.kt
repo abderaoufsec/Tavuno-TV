@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -56,6 +56,7 @@ import com.tavuno.tv.ui.screens.live.EpgTimeFormat
 import com.tavuno.tv.ui.theme.Dimens
 import com.tavuno.tv.ui.theme.TavunoTheme
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.roundToInt
@@ -246,6 +247,10 @@ private fun GuideDetailStrip(focused: FocusedCell?, zone: ZoneId) {
             .padding(Dimens.GapMedium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // if/else, deliberately NOT an early `return@Row`. Bailing out of a composable layout
+        // lambda part-way through leaves the composer's group stack unbalanced; the next
+        // recomposition then pops past the root group and kills the process with an
+        // IndexOutOfBoundsException out of ComposerImpl.endRoot.
         if (channel == null) {
             Text(
                 text = "Pick a channel on the left, or a programme to see its details.",
@@ -253,56 +258,55 @@ private fun GuideDetailStrip(focused: FocusedCell?, zone: ZoneId) {
                 color = colors.textSecondary,
                 maxLines = 2,
             )
-            return@Row
-        }
-
-        ChannelLogoPlate(
-            channelName = channel.name,
-            logoUrl = channel.logo,
-            modifier = Modifier.size(56.dp),
-        )
-        Spacer(Modifier.width(Dimens.GapMedium))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = channel.name,
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        } else {
+            ChannelLogoPlate(
+                channelName = channel.name,
+                logoUrl = channel.logo,
+                modifier = Modifier.size(56.dp),
             )
-            if (program == null) {
+            Spacer(Modifier.width(Dimens.GapMedium))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "No guide data for this channel",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                Text(
-                    text = program.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = program.description ?: "No description available",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = channel.name,
+                    style = MaterialTheme.typography.labelLarge,
                     color = colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (program == null) {
+                    Text(
+                        text = "No guide data for this channel",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Text(
+                        text = program.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = program.description ?: "No description available",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-        }
-        if (program != null) {
-            Spacer(Modifier.width(Dimens.GapMedium))
-            Text(
-                text = EpgTimeFormat.rangeLabel(program.startsAt, program.endsAt, zone).orEmpty(),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.primary,
-                maxLines = 1,
-            )
+            if (program != null) {
+                Spacer(Modifier.width(Dimens.GapMedium))
+                Text(
+                    text = EpgTimeFormat.rangeLabel(program.startsAt, program.endsAt, zone).orEmpty(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.primary,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
@@ -337,14 +341,25 @@ private fun GuideGridBody(
     var focusedRow by remember { mutableStateOf(0) }
     var focusedStartMinute by remember { mutableStateOf<Long?>(null) }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val viewportWidth = maxWidth
-        val viewportHeight = maxHeight
+    // The viewport size comes from the laid-out node instead of BoxWithConstraints. The
+    // constraint-reading variant builds a sub-composition, and sub-composing a grid this large
+    // desynchronised the composer's group stack and killed the app on first paint.
+    var viewportWidth by remember { mutableStateOf(0.dp) }
+    var viewportHeight by remember { mutableStateOf(0.dp) }
 
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged { size ->
+                viewportWidth = with(density) { size.width.toDp() }
+                viewportHeight = with(density) { size.height.toDp() }
+            },
+    ) {
         // Compose 1.5 does not bring a focused item into view by itself, so the grid does it:
         // the focused row is centred vertically and the focused programme sits about a third
         // in from the left, which keeps the upcoming programmes visible while you read.
         LaunchedEffect(focusedRow, viewportHeight) {
+            if (viewportHeight.value <= 0f) return@LaunchedEffect
             val targetDp = focusedRow * RowHeight.value -
                 viewportHeight.value / 2f + RowHeight.value / 2f
             val target = with(density) { targetDp.dp.toPx() }.roundToInt()
@@ -352,14 +367,20 @@ private fun GuideGridBody(
         }
         LaunchedEffect(focusedStartMinute, viewportWidth) {
             val minute = focusedStartMinute ?: return@LaunchedEffect
+            if (viewportWidth.value <= 0f) return@LaunchedEffect
             val targetDp = minute * GuideGrid.DP_PER_MINUTE - viewportWidth.value * 0.3f
             val target = with(density) { targetDp.dp.toPx() }.roundToInt()
             horizontal.animateScrollTo(target.coerceIn(0, horizontal.maxValue))
         }
         // Open on the present, not on midnight: the axis starts a couple of dp before "now".
-        // The first pass waits for measurement, because maxValue is 0 until the grid is laid out.
+        // maxValue is 0 until the grid is laid out, so the first pass waits for a real scroll
+        // range -- but never indefinitely. A window that fits the viewport has no range at all,
+        // and `first { it > 0 }` would suspend forever, pinning a snapshot observer for the life
+        // of the screen.
         LaunchedEffect(windowStart, channels.size) {
-            val maxValue = snapshotFlow { horizontal.maxValue }.first { it > 0 }
+            val maxValue = withTimeoutOrNull(2_000L) {
+                snapshotFlow { horizontal.maxValue }.first { it > 0 }
+            } ?: return@LaunchedEffect
             val targetDp = nowMinute * GuideGrid.DP_PER_MINUTE - 24
             val target = with(density) { targetDp.dp.toPx() }.roundToInt()
             horizontal.scrollTo(target.coerceIn(0, maxValue))
