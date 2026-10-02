@@ -88,6 +88,17 @@ class Settings(BaseSettings):
     email_base_url: str = Field(default="https://tavuno.com", validation_alias="EMAIL_BASE_URL")
     password_reset_ttl_seconds: int = Field(default=3600, validation_alias="PASSWORD_RESET_TTL_SECONDS")
 
+    # Ops dashboard (M15). Read-only status endpoint gated by a shared secret
+    # rather than by `require_admin`: in free-launch mode (AUTH_OPEN_ACCESS) the
+    # seeded guest identity has role `user`, so every require_admin route
+    # answers 403 while the app ships without login — gating a dashboard on a
+    # login system that is deliberately off would make it unreachable.
+    #
+    # **Change this in production.** It ships as a working default so a fresh
+    # clone has a usable dashboard, and the header is compared in constant time
+    # (hmac.compare_digest) so it cannot be probed byte by byte.
+    ops_token: str = Field(default="tavuno-ops-local", validation_alias="TAVUNO_OPS_TOKEN")
+
     @property
     def postgres_dsn(self) -> str:
         return (

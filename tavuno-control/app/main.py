@@ -5,7 +5,7 @@ from typing import Annotated, Any
 import time
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status, Header
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from .config import get_settings
@@ -23,6 +23,7 @@ from .epg.service import EpgService, parse_timestamp
 from .profiles.models import CreateProfileRequest, UpdateProfileRequest
 from .profiles.service import ProfilesService
 from .session_reaper import reap_expired_sessions
+from .ops import OPS_HTML, OpsService, token_matches
 from . import metrics as prometheus_metrics
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
@@ -226,6 +227,40 @@ def metrics_endpoint(services: ServicesDependency) -> Response:
     """
     body, content_type = prometheus_metrics.render(services)
     return Response(content=body, media_type=content_type)
+
+
+@app.get("/v1/ops", tags=["operations"], response_class=HTMLResponse, summary="Ops dashboard (M15)")
+def ops_page() -> HTMLResponse:
+    """Read-only operations dashboard (M15).
+
+    Served without authentication because the document carries no data — it is
+    an empty shell that fetches ``/v1/ops/summary`` and holds the caller's
+    token in sessionStorage. Serving the HTML openly is what keeps the secret
+    out of the URL, the document, and the access log; the data endpoint is the
+    one that is guarded.
+
+    Write operations stay in Directus. See ``docs/00_TavunoTV_Master_Strategy.md``
+    ("Directus Studio initially, custom Tavuno Admin UI later where needed").
+    """
+    return HTMLResponse(content=OPS_HTML)
+
+
+@app.get("/v1/ops/summary", tags=["operations"], summary="Ops dashboard data (M15)")
+def ops_summary(
+    services: ServicesDependency,
+    x_ops_token: str | None = Header(None),
+) -> dict[str, Any]:
+    """Snapshot of catalog, health, sync, playback and schema state.
+
+    Guarded by a shared secret rather than ``require_admin``: under
+    ``AUTH_OPEN_ACCESS`` the guest principal has role ``user``, so an
+    admin-gated route would be unreachable for as long as the app ships
+    without login. Compared in constant time (``hmac.compare_digest``).
+    """
+    expected = getattr(services.settings, "ops_token", "")
+    if not token_matches(expected, x_ops_token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid ops token")
+    return OpsService(services).snapshot()
 
 
 @app.get("/v1/home", tags=["catalog"])

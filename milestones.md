@@ -232,6 +232,31 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 - **Tests:** `tests/test_migrations.py` (21 cases) — discovery order, ledger reads, apply / skip,
   cursor draining for multi-statement scripts, connection lifecycle, and the re-runnability guards.
 
+### M15 — Admin Platform ✅ COMPLETE (2026-10-02)
+- **Scope decision, per the recorded strategy:** Directus stays the CRUD admin
+  surface (`00_TavunoTV_Master_Strategy.md`: "Directus Studio initially, custom
+  Tavuno Admin UI later where needed"). Rebuilding channel/EPG/VOD editors would
+  duplicate a platform that already runs, and that effort buys more as features.
+- **Read-only ops dashboard added instead — `GET /v1/ops`** (HTML shell) and
+  **`GET /v1/ops/summary`** (JSON), in `app/ops.py`. Six independently-guarded
+  sections: health, Dispatcharr sync, catalog counts, active playback sessions,
+  migration-ledger state, and the live-channel test scope. One broken section
+  yields a field, not a 500 — the dashboard matters most during an outage.
+- **Gated by `X-Ops-Token`, not `require_admin`.** Under `AUTH_OPEN_ACCESS` the
+  guest principal has role `user`, so every admin-gated route answers 403 while
+  the app ships without login; gating on a login system that is deliberately off
+  would make it unreachable. Compared with `hmac.compare_digest`.
+- **The HTML shell carries no data and no token** — the page reads the operator's
+  token from `sessionStorage` and sends it as a header, keeping the secret out of
+  the document, the URL and the access log.
+- **Read-only by construction:** `tests/test_ops.py` asserts no write verb exists
+  under `/v1/ops`.
+- **Verified live:** page 200 without a token; summary 401 with none or a wrong
+  one, 200 with the right one, returning real values (2036 channels, 9828 EPG
+  programmes, 8 migrations, all four dependencies healthy).
+- **Tests:** `tests/test_ops.py` (20 cases). Suite: **407 passed / 13 skipped**.
+- **Docs:** `docs/M15_Admin.md`.
+
 ### M16 — Monitoring & Operations ✅ COMPLETE (2026-10-02)
 - **`GET /metrics`** on `tavuno-control` (`app/metrics.py`): request count and
   latency labelled by **route template** (never the concrete path — `/v1/channels/{channel_id}`
@@ -286,10 +311,6 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 - Backend subscription system exists
 - Plan management exists
 - No production billing integration
-
-### M15 — Admin Platform ⚠️ PARTIAL
-- Directus admin interface available
-- No custom admin UI
 
 ### M17 — Security Hardening ⚠️ PARTIAL
 - HTTPS needs production configuration

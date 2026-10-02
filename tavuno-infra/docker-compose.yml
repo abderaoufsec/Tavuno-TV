@@ -447,6 +447,11 @@ services:
       # tavuno-infra/scripts/apply-m2-schema.ps1, and fail where that has never
       # run. Set TAVUNO_AUTO_MIGRATE=false to manage the schema by hand.
       TAVUNO_AUTO_MIGRATE: ${TAVUNO_AUTO_MIGRATE:-true}
+      # Shared secret for the read-only ops dashboard (GET /v1/ops). Guarded by
+      # a token rather than require_admin because free-launch mode gives the
+      # guest role `user`, which would make every admin route 403. Override in
+      # production.
+      TAVUNO_OPS_TOKEN: ${TAVUNO_OPS_TOKEN:-tavuno-ops-local}
 
     healthcheck:
       test:
