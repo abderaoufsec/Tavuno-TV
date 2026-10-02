@@ -1,0 +1,64 @@
+# Alertmanager (M16).
+#
+# The route below delivers to a receiver with no integrations: alerts are
+# recorded, visible in the Alertmanager UI, and exposed as the `ALERTS`
+# series — but nothing is pushed anywhere. That is deliberate here.
+#
+# This repository has no SMTP implementation yet (`app/auth/email_service.py`
+# is a TODO stub), so an email receiver could not send even if configured, and
+# pointing a webhook at an invented URL would either spam delivery errors or
+# silently discard pages while looking configured. A null receiver is the
+# honest state: the pipeline is wired and verified, delivery is one edit away.
+#
+# To actually receive alerts, add ONE block under the `default` receiver
+# below and restart:
+#
+#   webhook_configs:
+#     - url: https://hooks.slack.com/services/<...>
+#       send_resolved: true
+#
+#   email_configs:
+#     - to: ops@example.com          # also set global.smtp_* first
+#
+# The route, grouping and inhibition need no change — they are independent of
+# how a notification leaves the system.
+
+global:
+  # How long an alert may stay unresolved before Alertmanager considers the
+  # send complete. Does not affect the null receiver's behaviour, but it is
+  # what a future receiver will inherit.
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  # Grouping by alert already collapses a dependency outage into one event
+  # rather than one per affected route, which is the whole reason to have
+  # Alertmanager in front of the rules.
+  group_by: ["alertname", "job"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Critical alerts group faster and repeat sooner: they are the ones worth
+    # interrupting someone for.
+    - matchers:
+        - severity="critical"
+      receiver: default
+      group_wait: 10s
+      repeat_interval: 1h
+
+inhibit_rules:
+  # When the API is unreachable, its error-rate and latency warnings describe
+  # the same outage — suppress them so one incident produces one alert chain.
+  # Matched on `job`, which both the `up` metric and the (job-preserving)
+  # aggregations in alerts.yml carry.
+  - source_matchers:
+      - alertname="TavunoApiDown"
+    target_matchers:
+      - severity="warning"
+    equal: ["job"]
+
+# A receiver with no integration configs is valid and discards notifications.
+# See the header for how to make it deliver.
+receivers:
+  - name: default

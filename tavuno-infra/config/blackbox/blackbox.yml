@@ -1,0 +1,28 @@
+# blackbox-exporter probe modules (M16).
+#
+# One module, not two, because both probed endpoints share the same contract:
+# HTTP 200 *and* `"status": "ok"` in the JSON body.
+#
+# The body check is the load-bearing part. It exists because
+# `GET /v1/ome/health` deliberately returns 200 with
+# `{"status": "unreachable", "error": ...}` when OvenMediaEngine is down —
+# only the *body* distinguishes up from down. A valid_status_codes-only probe
+# would report a dead media server as healthy, which is worse than no probe:
+# it would silence the alert that matters most.
+
+modules:
+  tavuno_health_ok:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      valid_http_versions:
+        - HTTP/1.1
+        - HTTP/2.0
+      valid_status_codes:
+        - 200
+      preferred_ip_protocol: ip4
+      # `\s*` so this survives either json encoding: `{"status":"ok"}` from
+      # FastAPI and `{"status": "ok"}` from a pretty-printer.
+      fail_if_body_not_matches_regexp:
+        - '"status"\s*:\s*"ok"'

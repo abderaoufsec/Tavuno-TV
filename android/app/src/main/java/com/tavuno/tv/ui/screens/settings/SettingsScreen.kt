@@ -24,9 +24,14 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Reorder
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,9 +61,24 @@ fun SettingsScreen(
     onOpenCustomizeChannels: () -> Unit = {},
     onOpenCustomizeCategories: () -> Unit = {},
     onLogout: () -> Unit,
+    // Key of the row to hand focus back to when this screen is shown again after one of the
+    // sub-screens it opened closed; null on a first entry from the rail. See TavunoMainScreen.
+    restoreFocusKey: String? = null,
 ) {
     val colors = TavunoTheme.colors
     val scope = rememberCoroutineScope()
+
+    // Focus hand-back. The sub-screens take focus on entry, so the row that opened one is no
+    // longer the focus owner by the time it closes; without this the first press falls through
+    // to the rail's Home item and the viewer has to walk the whole rail again.
+    val restoreFocus = remember { FocusRequester() }
+    LaunchedEffect(restoreFocusKey) {
+        if (restoreFocusKey == null) return@LaunchedEffect
+        repeat(3) {
+            withFrameNanos {}
+            if (runCatching { restoreFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -89,6 +109,11 @@ fun SettingsScreen(
                 subtitle = "Add and manage profiles for everyone on this account",
                 icon = Icons.Filled.People,
                 onClick = onOpenProfiles,
+                modifier = if (restoreFocusKey == "profiles") {
+                    Modifier.focusRequester(restoreFocus)
+                } else {
+                    Modifier
+                },
             )
         }
         item(key = "customize-channels") {
@@ -97,6 +122,11 @@ fun SettingsScreen(
                 subtitle = "Reorder and hide live channels for this profile",
                 icon = Icons.Filled.Reorder,
                 onClick = onOpenCustomizeChannels,
+                modifier = if (restoreFocusKey == "customize-channels") {
+                    Modifier.focusRequester(restoreFocus)
+                } else {
+                    Modifier
+                },
             )
         }
         item(key = "customize-categories") {
@@ -105,6 +135,11 @@ fun SettingsScreen(
                 subtitle = "Reorder and hide rails for this profile",
                 icon = Icons.Filled.Category,
                 onClick = onOpenCustomizeCategories,
+                modifier = if (restoreFocusKey == "customize-categories") {
+                    Modifier.focusRequester(restoreFocus)
+                } else {
+                    Modifier
+                },
             )
         }
         item(key = "playback") {
@@ -146,12 +181,15 @@ private fun SettingsRow(
     title: String,
     subtitle: String,
     icon: ImageVector,
+    // Declared before the trailing lambda on purpose: Kotlin binds a trailing lambda to the
+    // *last* parameter, so `onClick` has to stay last for the placeholder rows to compile.
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val colors = TavunoTheme.colors
     FocusableSurface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimens.CornerMedium),
         focusedScale = 1.0f,
         unfocusedContainerColor = colors.surfaceContainerLow,

@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS tavuno_movies (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
-    category_id INTEGER REFERENCES tavuno_categories(id) ON DELETE SET NULL,
+    -- Named "category", not "category_id": catalog/service.py and sync_service.py
+    -- both read and write this column under that name.
+    category INTEGER REFERENCES tavuno_categories(id) ON DELETE SET NULL,
     synopsis TEXT,
     release_year INTEGER,
     poster VARCHAR(255), -- UUID as string
@@ -25,7 +27,8 @@ CREATE TABLE IF NOT EXISTS tavuno_series (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
-    category_id INTEGER REFERENCES tavuno_categories(id) ON DELETE SET NULL,
+    -- "category", matching the catalog and sync code (see tavuno_movies above).
+    category INTEGER REFERENCES tavuno_categories(id) ON DELETE SET NULL,
     synopsis TEXT,
     poster VARCHAR(255), -- UUID as string
     backdrop VARCHAR(255), -- UUID as string
@@ -68,12 +71,35 @@ CREATE TABLE IF NOT EXISTS tavuno_episodes (
     UNIQUE(season, episode_number)
 );
 
+-- Reconcile databases that predate the columns this file's indexes and triggers
+-- reference.  The CREATE TABLE IF NOT EXISTS statements above leave an existing
+-- table alone, so any table created by an earlier revision of this file (or by
+-- hand-run DDL) would lack columns the indexes and triggers below access.
+-- ADD COLUMN IF NOT EXISTS makes the whole file converge on either path.
+ALTER TABLE tavuno_movies ADD COLUMN IF NOT EXISTS category INTEGER REFERENCES tavuno_categories(id) ON DELETE SET NULL;
+ALTER TABLE tavuno_movies ADD COLUMN IF NOT EXISTS external_id VARCHAR(120);
+ALTER TABLE tavuno_movies ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+ALTER TABLE tavuno_series ADD COLUMN IF NOT EXISTS category INTEGER REFERENCES tavuno_categories(id) ON DELETE SET NULL;
+ALTER TABLE tavuno_series ADD COLUMN IF NOT EXISTS external_id VARCHAR(120);
+ALTER TABLE tavuno_series ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+ALTER TABLE tavuno_seasons ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+ALTER TABLE tavuno_episodes ADD COLUMN IF NOT EXISTS external_id VARCHAR(120);
+ALTER TABLE tavuno_episodes ADD COLUMN IF NOT EXISTS stream_url TEXT;
+ALTER TABLE tavuno_episodes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+-- Note: additional columns declared in the CREATE blocks above (poster, backdrop,
+-- duration, provider, thumbnail, is_active, created_at) are NOT added here
+-- because none of the migration file's own statements reference them.  A database
+-- that predates them will still work at the app level — those features simply
+-- return None (handled by row.get() in the catalog service).  If a future feature
+-- needs them, add an ALTER TABLE below.
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tavuno_movies_slug ON tavuno_movies(slug);
-CREATE INDEX IF NOT EXISTS idx_tavuno_movies_category ON tavuno_movies(category_id);
+CREATE INDEX IF NOT EXISTS idx_tavuno_movies_category ON tavuno_movies(category);
 CREATE INDEX IF NOT EXISTS idx_tavuno_movies_external ON tavuno_movies(external_id);
 CREATE INDEX IF NOT EXISTS idx_tavuno_series_slug ON tavuno_series(slug);
-CREATE INDEX IF NOT EXISTS idx_tavuno_series_category ON tavuno_series(category_id);
+CREATE INDEX IF NOT EXISTS idx_tavuno_series_category ON tavuno_series(category);
 CREATE INDEX IF NOT EXISTS idx_tavuno_series_external ON tavuno_series(external_id);
 CREATE INDEX IF NOT EXISTS idx_tavuno_seasons_series ON tavuno_seasons(series);
 CREATE INDEX IF NOT EXISTS idx_tavuno_seasons_number ON tavuno_seasons(season_number);

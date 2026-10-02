@@ -18,6 +18,26 @@ class Settings(BaseSettings):
     redis_password: str = Field(validation_alias="REDIS_PASSWORD")
     catalog_cache_seconds: int = Field(default=30, validation_alias="TAVUNO_CATALOG_CACHE_SECONDS")
 
+    # Schema management. ``app/db_migrations.py`` applies the SQL files in
+    # ``tavuno-control/migrations`` in filename order and records each one in the
+    # ``tavuno_schema_migrations`` ledger, so a file is executed exactly once.
+    #   TAVUNO_AUTO_MIGRATE = true  -> apply pending migrations during API startup
+    #   false (default)             -> start without touching the schema
+    # Every migration guards itself with IF NOT EXISTS / ON CONFLICT, so turning
+    # this on against a database that was migrated by hand replays the set as
+    # no-ops instead of failing.
+    #
+    # The set patches an existing schema rather than bootstrapping one: the
+    # tables it alters and references (tavuno_profiles, tavuno_devices,
+    # tavuno_plans, tavuno_categories, tavuno_channels, tavuno_channel_sources)
+    # come from the Directus base schema applied by
+    # tavuno-infra/scripts/apply-m2-schema.ps1. Against a database where that has
+    # never run, 001_m9_auth_schema.sql fails with
+    # relation "tavuno_profiles" does not exist. tests/test_migrations_live.py
+    # pins both halves of that: the failure without the base schema, and a full
+    # apply once it is in place.
+    auto_migrate: bool = Field(default=False, validation_alias="TAVUNO_AUTO_MIGRATE")
+
     dispatcharr_url: str = Field(default="http://dispatcharr:9191", validation_alias="DISPATCHARR_URL")
     dispatcharr_api_key: str | None = Field(default=None, validation_alias="DISPATCHARR_API_KEY")
     dispatcharr_expected_version: str = Field(default="0.28.0", validation_alias="DISPATCHARR_EXPECTED_VERSION")

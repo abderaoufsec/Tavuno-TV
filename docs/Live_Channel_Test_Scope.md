@@ -39,6 +39,34 @@ answering. A playable upstream is returned as `protocol: "http_hls"`; anything
 unreachable silently falls back to the OME relay (`protocol: "hls"`). The script
 therefore treats **`http_hls` as proof the stream plays right now**.
 
+### Pointing the emulator at the backend
+
+The scope is enforced **server-side**, so the Android client needs no change to
+benefit from it — but the emulator cannot reach the host as `localhost`. Tavuno TV
+already defaults to `http://10.0.2.2:8000` (`TAVUNO_API_BASE_URL` in
+`android/gradle.properties`, surfaced as `BuildConfig.TAVUNO_API_BASE_URL`), and
+`10.0.2.2` is the emulator’s alias for the host loopback. Playback URLs get the
+same rewrite (`PlaybackUrls`), so a stream URL the backend built with `localhost`
+still plays on the emulator.
+
+If `/v1/channels` looks empty on the emulator while `curl
+http://localhost:8000/v1/channels` answers, check the app’s base URL *before* the
+scope: an app pointed at the device’s own loopback never reaches `tavuno-control`.
+
+### The current working scope
+
+`find_working_channels.py` writes into `tavuno-infra/.env`, which is gitignored — so the
+*working* set (as opposed to the template above) is not in the repository. As of 2026-10-02 the
+running dev stack is scoped to these 10 verified channel ids, with `TAVUNO_LIVE_CHANNEL_LIMIT=10`:
+
+```
+8845,6860,6861,6862,6863,8844,6869,6870,6871,6874
+```
+
+Reproduce it either by re-running the script (it re-probes upstreams, so the set may differ if
+streams have since gone away) or by pasting the ids above into `tavuno-infra/.env` and
+restarting `tavuno-control`. Clearing the scope restores the full 2036-channel catalog.
+
 ## Restore the full catalog
 
 ```bash

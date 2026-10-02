@@ -211,11 +211,122 @@ services:
 
     volumes:
       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Mounted separately rather than as the whole directory: the config file
+      # is already named in prometheus.yml's rule_files, so this keeps the
+      # compose entry next to the file a reviewer will actually open.
+      - ./config/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - tavuno_prometheus_data:/prometheus
 
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
+
+    networks:
+      - tavuno-internal
+
+
+  # Engine-level database metrics the application cannot observe about its own
+  # connection. Read-only by construction: the exporter only ever issues
+  # pg_stat_* style queries.
+  #
+  # v0.15.0 on purpose, not a newer tag: this deployment's database password
+  # contains `#`, which is a fragment delimiter in a URL. v0.15.0 honours
+  # DATA_SOURCE_URI/USER/PASS as libpq keyword parameters (no URL parsing), so
+  # it authenticates correctly; v0.20.1 rebuilds a DSN string and silently
+  # truncates the password, failing auth on every scrape.
+  #
+  # stat_bgwriter is disabled because PostgreSQL 17 split pg_stat_bgwriter into
+  # separate bgwriter/checkpointer views, and this exporter still reads the old
+  # one ("column checkpoints_timed does not exist"). The dashboard uses
+  # numbackends/transactions, which come from pg_stat_database instead.
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+
+    command:
+      - "--no-collector.stat_bgwriter"
+    container_name: tavuno-postgres-exporter
+    restart: unless-stopped
+
+    environment:
+      # Split into URI/user/pass rather than a single DATA_SOURCE_NAME URL
+      # because the password is not URL-safe: a `#` in a URL begins a
+      # fragment, so `postgresql://user:pa##word@host` authenticates with a
+      # silently truncated password. These three variables are passed to the
+      # driver directly and need no escaping.
+      DATA_SOURCE_URI: "postgres:5432/${POSTGRES_DB}?sslmode=disable"
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - tavuno-internal
+
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: tavuno-redis-exporter
+    restart: unless-stopped
+
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+      # redis.conf requires auth, so the exporter has to authenticate to be
+      # able to report anything at all.
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    networks:
+      - tavuno-internal
+
+
+  # Records alerts, groups them and applies inhibition.
+  #
+  # The default receiver has no integrations on purpose (see
+  # config/alertmanager/alertmanager.yml): alerts are visible in the
+  # Alertmanager UI and the ALERTS series, but nothing is delivered, because
+  # this repository has no SMTP implementation yet and inventing a webhook
+  # target would either spam errors or silently discard pages while appearing
+  # configured. Adding `webhook_configs` to that receiver is the one edit
+  # needed to start delivering.
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: tavuno-alertmanager
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:9093:9093"
+
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - tavuno_alertmanager_data:/alertmanager
+
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+
+    networks:
+      - tavuno-internal
+
+
+  # Probes dependencies that expose no Prometheus metrics of their own
+  # (Dispatcharr, OvenMediaEngine) from the outside, with its own short
+  # timeout — so a hung dependency cannot stall the scrape that would report
+  # it, which is what happens if the API probes them inline.
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: tavuno-blackbox-exporter
+    restart: unless-stopped
+
+    volumes:
+      - ./config/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+
+    command:
+      - "--config.file=/etc/blackbox_exporter/config.yml"
 
     networks:
       - tavuno-internal
@@ -240,6 +351,10 @@ services:
     volumes:
       - tavuno_grafana_data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      # Dashboard JSON lives outside the provisioning tree so the provider in
+      # provisioning/dashboards can watch it and pick up edits without a
+      # container restart.
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
 
     networks:
       - tavuno-internal
@@ -323,6 +438,15 @@ services:
       # limit 0 exposes the full synced catalog (production).
       TAVUNO_LIVE_CHANNEL_ALLOWLIST: ${TAVUNO_LIVE_CHANNEL_ALLOWLIST:-}
       TAVUNO_LIVE_CHANNEL_LIMIT: ${TAVUNO_LIVE_CHANNEL_LIMIT:-0}
+      # Apply the SQL files in tavuno-control/migrations at startup, recording each
+      # one in the tavuno_schema_migrations ledger. On by default for this dev stack
+      # so an already-initialized clone reaches a working schema with no manual
+      # step; every migration guards itself, so replaying one against an existing
+      # database is a no-op. This does not bootstrap a database from nothing: the
+      # migrations patch the Directus base schema created by
+      # tavuno-infra/scripts/apply-m2-schema.ps1, and fail where that has never
+      # run. Set TAVUNO_AUTO_MIGRATE=false to manage the schema by hand.
+      TAVUNO_AUTO_MIGRATE: ${TAVUNO_AUTO_MIGRATE:-true}
 
     healthcheck:
       test:
@@ -359,6 +483,9 @@ volumes:
 
   tavuno_prometheus_data:
     name: tavuno_prometheus_data
+
+  tavuno_alertmanager_data:
+    name: tavuno_alertmanager_data
 
   tavuno_grafana_data:
     name: tavuno_grafana_data

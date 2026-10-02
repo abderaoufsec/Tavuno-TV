@@ -28,9 +28,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -151,6 +154,19 @@ fun ProfilesScreen(
             )
         }
     }
+    // Entry focus. Same trap as CustomizeScreen: the Settings row that opened this screen is
+    // unmounted by the time the first D-pad press arrives, so focus would otherwise fall
+    // through to the rail's Home item. "Add profile" is the first thing worth pressing anyway.
+    // The panel's name field deliberately stays out of this — it would open the IME on entry.
+    val entryFocus = remember { FocusRequester() }
+    LaunchedEffect(isLoading, errorMessage == null) {
+        if (isLoading || errorMessage != null) return@LaunchedEffect
+        repeat(3) {
+            withFrameNanos {}
+            if (runCatching { entryFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(bottom = Dimens.GapSmall)) {
             Text(
@@ -189,6 +205,7 @@ fun ProfilesScreen(
                         },
                         style = if (isAdding) TavunoButtonStyle.SECONDARY else TavunoButtonStyle.PRIMARY,
                         compact = true,
+                        modifier = Modifier.focusRequester(entryFocus),
                     )
                     status?.let {
                         Text(

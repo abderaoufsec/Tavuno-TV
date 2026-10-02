@@ -62,12 +62,19 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Apply triggers
+-- Apply triggers.
+-- Each one is dropped first: CREATE TRIGGER has no IF NOT EXISTS, so without the
+-- drop this migration would fail with "trigger ... already exists" the moment the
+-- migration runner replays it against a database that already has the sports
+-- tables. Same pattern as 006_m12_vod_schema.sql.
+DROP TRIGGER IF EXISTS update_tavuno_competitions_updated_at ON tavuno_competitions;
 CREATE TRIGGER update_tavuno_competitions_updated_at BEFORE UPDATE ON tavuno_competitions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_tavuno_teams_updated_at ON tavuno_teams;
 CREATE TRIGGER update_tavuno_teams_updated_at BEFORE UPDATE ON tavuno_teams
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_tavuno_matches_updated_at ON tavuno_matches;
 CREATE TRIGGER update_tavuno_matches_updated_at BEFORE UPDATE ON tavuno_matches
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

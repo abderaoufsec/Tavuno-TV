@@ -5,13 +5,14 @@ from typing import Annotated, Any
 import time
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status, Header
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from .config import get_settings
 from .playback import authorize_live_playback, authorize_movie_playback, authorize_episode_playback, heartbeat_session, stop_session, generate_auth_token, verify_playback_token
 from .playback_identity import resolve_playback_identity
 from .services import Services
+from .db_migrations import run_migrations
 from .auth.router import router as auth_router
 from .devices.router import router as devices_router
 from .auth.deps import current_principal, require_admin
@@ -22,6 +23,7 @@ from .epg.service import EpgService, parse_timestamp
 from .profiles.models import CreateProfileRequest, UpdateProfileRequest
 from .profiles.service import ProfilesService
 from .session_reaper import reap_expired_sessions
+from . import metrics as prometheus_metrics
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("tavuno-control")
@@ -34,6 +36,24 @@ async def lifespan(app: FastAPI):
     if getattr(app.state, "services", None) is None:
         app.state.services = Services(get_settings())
     services: Services = app.state.services
+
+    if services.settings.auto_migrate:
+        # Schema first, background loops second. A failure here is fatal on
+        # purpose: answering requests against a schema we could not bring up to
+        # date is worse than refusing to start. run_migrations goes through
+        # services.connection's context manager, so a migration that fails rolls
+        # back together with its ledger row.
+        try:
+            report = run_migrations(services.connection)
+        except Exception:
+            logger.exception("Automatic database migration failed")
+            raise
+        logger.info("Automatic database migration: %s", report.summary())
+    else:
+        logger.info(
+            "Automatic database migration disabled (set TAVUNO_AUTO_MIGRATE=true to enable)"
+        )
+
     dispatcharr_interval = services.settings.dispatcharr_sync_interval_seconds
     session_reaper_interval = services.settings.session_reaper_interval_seconds
     stop = asyncio.Event()
@@ -98,10 +118,41 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.state.services = None
+prometheus_metrics.set_build_info("0.3.0")
 
 # Include routers
 app.include_router(auth_router)
 app.include_router(devices_router)
+
+
+@app.middleware("http")
+async def observe_requests(request: Request, call_next):
+    """Count and time every request (M16).
+
+    Reading the route template *after* ``call_next`` matters: routing has run
+    by then, so ``scope["route"]`` holds the pattern rather than the concrete
+    path, and a 404 (which never matched a route) falls back to a single
+    ``unmatched`` bucket instead of minting a label per probed URL.
+
+    Wrapped so instrumentation can never fail a request — a broken metric
+    must not become a 500.
+    """
+    started = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        try:
+            prometheus_metrics.observe_request(
+                method=request.method,
+                route=prometheus_metrics.route_template(request),
+                status=status_code,
+                started_at=started,
+            )
+        except Exception:
+            logger.debug("request observation failed", exc_info=True)
 
 
 def get_services(request: Request) -> Services:
@@ -158,6 +209,23 @@ def health(services: ServicesDependency) -> dict[str, Any]:
     if last_sync:
         payload["last_dispatcharr_sync"] = last_sync
     return payload
+
+
+@app.get("/metrics", tags=["operations"], summary="Prometheus exposition (M16)")
+def metrics_endpoint(services: ServicesDependency) -> Response:
+    """Prometheus scrape target.
+
+    Unauthenticated on purpose — Prometheus has no credentials to send, and
+    the port is bound to loopback by compose — and excluded from the
+    request-observation middleware's own route label only by virtue of being
+    a route like any other, so its traffic is visible too.
+
+    The gauges are re-read here rather than on a timer: scraping *is* the
+    trigger, so the numbers are at most one scrape stale and there is no
+    background loop to leak or desynchronise.
+    """
+    body, content_type = prometheus_metrics.render(services)
+    return Response(content=body, media_type=content_type)
 
 
 @app.get("/v1/home", tags=["catalog"])
@@ -588,13 +656,15 @@ def playback_live(
     try:
         profile_id, device_key = resolve_playback_identity(None, services, authorization)
         with database(services) as connection:
-            return authorize_live_playback(
+            result = authorize_live_playback(
                 profile_id=profile_id,
                 device_key=device_key,
                 channel_id=channel_id,
                 connection=connection,
                 settings=services.settings,
             )
+        prometheus_metrics.observe_playback_session("live")
+        return result
     except HTTPException:
         raise
     except ValueError as exc:
@@ -668,13 +738,15 @@ def playback_movie(
     try:
         profile_id, device_key = resolve_playback_identity(None, services, authorization)
         with database(services) as connection:
-            return authorize_movie_playback(
+            result = authorize_movie_playback(
                 profile_id=profile_id,
                 device_key=device_key,
                 movie_id=movie_id,
                 connection=connection,
                 settings=services.settings,
             )
+        prometheus_metrics.observe_playback_session("movie")
+        return result
     except HTTPException:
         raise
     except ValueError as exc:
@@ -699,13 +771,15 @@ def playback_episode(
     try:
         profile_id, device_key = resolve_playback_identity(None, services, authorization)
         with database(services) as connection:
-            return authorize_episode_playback(
+            result = authorize_episode_playback(
                 profile_id=profile_id,
                 device_key=device_key,
                 episode_id=episode_id,
                 connection=connection,
                 settings=services.settings,
             )
+        prometheus_metrics.observe_playback_session("episode")
+        return result
     except HTTPException:
         raise
     except ValueError as exc:

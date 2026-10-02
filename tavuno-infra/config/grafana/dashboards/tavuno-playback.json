@@ -1,0 +1,110 @@
+{
+  "uid": "tavuno-playback",
+  "title": "Tavuno Playback",
+  "description": "Playback sessions and zap latency (M16).",
+  "tags": ["tavuno", "m16"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Active sessions",
+      "description": "Active and heartbeating within 90s — the same predicate playback.py enforces max_concurrent_streams with.",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "targets": [{ "refId": "A", "expr": "tavuno_active_playback_sessions" }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Sessions started (1h)",
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(tavuno_playback_sessions_started_total[1h]))" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "p95 zap authorization",
+      "description": "Time to authorize a live channel — what zapping feels like.",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1.5 }, { "color": "red", "value": 2.5 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(tavuno_http_request_duration_seconds_bucket{route=\"/v1/playback/live/{channel_id}\"}[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Session starts by content type",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (content_type) (rate(tavuno_playback_sessions_started_total[5m]))",
+          "legendFormat": "{{content_type}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Active sessions over time",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "tavuno_active_playback_sessions", "legendFormat": "active" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Playback authorization latency percentiles",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 0, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(tavuno_http_request_duration_seconds_bucket{route=\"/v1/playback/live/{channel_id}\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(tavuno_http_request_duration_seconds_bucket{route=\"/v1/playback/live/{channel_id}\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(tavuno_http_request_duration_seconds_bucket{route=\"/v1/playback/live/{channel_id}\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    }
+  ]
+}

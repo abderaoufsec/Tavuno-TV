@@ -29,10 +29,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -110,11 +118,34 @@ fun SearchScreen(
     // Open on the field: on a TV, "go to Search and type" is the whole interaction.
     LaunchedEffect(Unit) { fieldFocus.requestFocus() }
 
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(Dimens.GapSmall),
+            .padding(Dimens.GapSmall)
+            // Escape hatch for the search field, which is otherwise a dead end for a remote.
+            // Two things eat the arrow keys, in order: while the soft keyboard is up it owns
+            // them outright (they never reach Compose, so BACK — handled by the system —
+            // dismisses the keyboard first); once the keyboard is gone the text field itself
+            // keeps UP/DOWN for cursor movement, so focus still could not leave it and the
+            // results below stayed unreachable. Preview handlers run root-to-focused-node, so
+            // this sees the key before the field does. LEFT/RIGHT are deliberately left alone
+            // so the cursor can still be nudged inside the query.
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val direction = when (event.key) {
+                    Key.DirectionDown -> FocusDirection.Down
+                    Key.DirectionUp -> FocusDirection.Up
+                    else -> return@onPreviewKeyEvent false
+                }
+                if (direction == FocusDirection.Down) keyboard?.hide()
+                // `false` when there is nothing to move to (empty result set), so the key is
+                // never swallowed for no reason.
+                focusManager.moveFocus(direction)
+            },
         verticalArrangement = Arrangement.spacedBy(Dimens.GapMedium),
     ) {
         SearchField(

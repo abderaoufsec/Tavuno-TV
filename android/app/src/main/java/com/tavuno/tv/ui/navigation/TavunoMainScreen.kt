@@ -2,8 +2,10 @@ package com.tavuno.tv.ui.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.tavuno.tv.core.AppModule
@@ -47,6 +49,14 @@ fun TavunoMainScreen(
 ) {
     var tab by rememberSaveable { mutableStateOf(TavunoTab.HOME) }
     var destination by rememberSaveable { mutableStateOf<ShellDestination?>(null) }
+    // Which Settings row opened the sub-screen currently on top. The sub-screens take focus on
+    // entry (see CustomizeScreen), so when one closes the row that opened it is no longer the
+    // focus owner — this key lets Settings hand focus back instead of dropping it, which would
+    // strand the remote on the rail's Home item.
+    var returnFocusKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(tab) {
+        if (tab != TavunoTab.SETTINGS) returnFocusKey = null
+    }
 
     // BACK unwinds one level at a time: an open sub-screen first, then the tab back to Home,
     // and only then out of the app — which is what every TV remote user expects.
@@ -128,10 +138,20 @@ fun TavunoMainScreen(
             TavunoTab.SETTINGS -> SettingsScreen(
                 authRepository = AppModule.authRepository,
                 onNavigateBack = { tab = TavunoTab.HOME },
-                onOpenProfiles = { destination = ShellDestination.PROFILES },
-                onOpenCustomizeChannels = { destination = ShellDestination.CUSTOMIZE_CHANNELS },
-                onOpenCustomizeCategories = { destination = ShellDestination.CUSTOMIZE_CATEGORIES },
+                onOpenProfiles = {
+                    returnFocusKey = "profiles"
+                    destination = ShellDestination.PROFILES
+                },
+                onOpenCustomizeChannels = {
+                    returnFocusKey = "customize-channels"
+                    destination = ShellDestination.CUSTOMIZE_CHANNELS
+                },
+                onOpenCustomizeCategories = {
+                    returnFocusKey = "customize-categories"
+                    destination = ShellDestination.CUSTOMIZE_CATEGORIES
+                },
                 onLogout = onLogout,
+                restoreFocusKey = returnFocusKey,
             )
             }
         }

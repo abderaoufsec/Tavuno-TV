@@ -22,10 +22,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -149,6 +152,22 @@ fun CustomizeScreen(
         }
     }
 
+    // Entry focus. Opening this screen unmounts the Settings row that was focused, so the very
+    // first D-pad press finds no focused node at all and Compose's focus system falls back to
+    // the first focusable in the tree — the rail's Home item. That is what stranded the remote:
+    // DOWN walked the rail instead of the rows. Hand focus to the first usable control on the
+    // first row instead, which is the contract TavunoShell already documents ("focus lands on
+    // the first content item"). The requester can only resolve once the rows exist *and* have
+    // been placed, so both waits live here rather than in a fire-once effect.
+    val entryFocus = remember { FocusRequester() }
+    LaunchedEffect(isLoading, items.isEmpty()) {
+        if (isLoading || items.isEmpty()) return@LaunchedEffect
+        repeat(3) {
+            withFrameNanos {}
+            if (runCatching { entryFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(bottom = Dimens.GapSmall)) {
             Text(
@@ -231,6 +250,7 @@ fun CustomizeScreen(
                             item = item,
                             position = position,
                             total = items.size,
+                            entryFocus = if (position == 0) entryFocus else null,
                             onMoveUp = {
                                 items = CustomizeItems.moveUp(items, position)
                                 isDirty = true
@@ -257,6 +277,8 @@ private fun CustomizeRow(
     item: CustomizableItem,
     position: Int,
     total: Int,
+    // Non-null only on the row the screen hands entry focus to; see CustomizeScreen.
+    entryFocus: FocusRequester? = null,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onToggleHidden: () -> Unit,
@@ -315,14 +337,33 @@ private fun CustomizeRow(
                 enabled = position < total - 1,
                 style = TavunoButtonStyle.SECONDARY,
                 compact = true,
-                modifier = Modifier.width(84.dp),
+                // The first row's ▲ is disabled by construction (nowhere to move to), so entry
+                // focus lands on ▼ — the first control there that can actually hold focus. A
+                // single-item list disables ▼ too, so Hide below takes over as the target.
+                modifier = Modifier
+                    .width(84.dp)
+                    .then(
+                        if (entryFocus != null && total > 1) {
+                            Modifier.focusRequester(entryFocus)
+                        } else {
+                            Modifier
+                        }
+                    ),
             )
             TavunoButton(
                 label = if (item.isHidden) "Show" else "Hide",
                 onClick = onToggleHidden,
                 style = if (item.isHidden) TavunoButtonStyle.PRIMARY else TavunoButtonStyle.SECONDARY,
                 compact = true,
-                modifier = Modifier.width(150.dp),
+                modifier = Modifier
+                    .width(150.dp)
+                    .then(
+                        if (entryFocus != null && total <= 1) {
+                            Modifier.focusRequester(entryFocus)
+                        } else {
+                            Modifier
+                        }
+                    ),
             )
         }
     }

@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Any
 
 from .dispatcharr_client import DispatcharrClient
@@ -107,6 +108,10 @@ class SyncService:
         try:
             summary = {
                 "status": "success",
+                # Timestamped here rather than by the reader: the sync is the
+                # only place that knows when it actually succeeded, and the
+                # staleness gauge and the alert rule both read this field.
+                "synced_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "dispatcharr_version": version,
                 "expected_version": self.expected_version,
                 "version_match": version == self.expected_version,

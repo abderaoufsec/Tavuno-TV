@@ -57,8 +57,12 @@ Port in vertical slices, keeping Tavuno TV buildable and tested after each slice
    Decision layer in `ui/screens/player/PlayerTracks.kt`; no backend work.
 3. ✅ **Slice B — search**: a grouped `GET /v1/search` on the backend (channels + movies + series)
    plus a Search tab in the shell. (commit `8320ae1`)
-4. ⏭ **Slice C — full EPG guide**: needs a windowed EPG endpoint (already a tracked backend task).
-5. ⏭ **Slice D — customize + profiles**: needs backend write endpoints.
+4. ✅ **Slice C — full EPG guide**: a windowed `GET /v1/epg/window` on the backend (one
+   request per grid screen, not one per channel) plus `ui/screens/guide/GuideScreen` — a
+   D-pad grid of every channel's programmes, zappable straight from a focused row.
+5. ✅ **Slice D — customize + profiles**: backend write endpoints for per-profile rail
+   order/visibility (`GET`/`PUT /v1/customize/{kind}`) and child viewing profiles
+   (`/v1/profiles`), plus the Customize and Profiles screens.
 
 Each slice: port the Kotlin, rewire to Tavuno's `TavunoApiService`/repositories, then
 `gradlew test assembleDebug` + emulator D-pad pass.
@@ -70,10 +74,10 @@ Each slice: port the Kotlin, rewire to Tavuno's `TavunoApiService`/repositories,
 | A — player parity (zap, remote map, HUD, channel overlay) | ✅ done | `LiveZapNavigatorTest`, `PlayerRemoteTest` |
 | A2 — subtitles | ✅ done | `PlayerTracksTest` |
 | B — search (backend endpoint + Android tab) | ✅ done | `test_catalog_service.py` |
-| C — full EPG guide | ⏭ not started (blocked on the windowed EPG endpoint) | — |
-| D — customize + profiles | ⏭ not started (blocked on backend write endpoints) | — |
+| C — full EPG guide (windowed endpoint + D-pad grid) | ✅ done | `GuideGridTest`, `test_epg_service.py` |
+| D — customize + profiles (write endpoints + screens) | ✅ done | `CustomizeItemsTest`, `test_customize_service.py`, `test_profiles_service.py` |
 
-Android unit suite after Slice A2: **65 passed / 0 failed**; backend suite: **235 passed / 8 skipped**.
+Android unit suite after Slice D: **93 passed / 0 failed** (12 suites); backend suite: **368 passed / 13 skipped** on the host, or **372 passed / 9 skipped** in-container against a live Postgres DSN.
 
 ## Not a straight copy
 

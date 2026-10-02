@@ -172,6 +172,108 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
   deliberately button-free) over three labelled result rows. Channel hits play immediately *and* arm
   the zap list; movie/series hits push their detail routes.
 
+### OwnTV Parity Port — Slice C: Full EPG Guide ✅ COMPLETE (2026-10-02)
+- **Backend:** `GET /v1/epg/window` (`app/epg/service.py`) answers every channel’s programmes that
+  overlap one window in a single query — one request per grid screen instead of one per row —
+  name-ordered, row-capped, and filtered by the same live-channel test scope as `/v1/channels`.
+- **Android:** `ui/screens/guide/GuideScreen` draws that window as a D-pad grid with the focused
+  cell’s programme detail beside it. Tuning from a row arms the zap list through the guide’s own
+  channel mapping, so CH± and ▲▼ surf the guide rather than a stale catalog list.
+
+### OwnTV Parity Port — Slice D: Customize + Profiles ✅ COMPLETE (2026-10-02)
+- **Backend, customization** (`app/customize/`): `GET`/`PUT`/`DELETE /v1/customize/{kind}` for
+  `live_channel`, `live_category` and `movie_category`. A PUT is a full replace for one kind, which
+  is exactly what makes "un-pin" expressible; the ordering decision is a pure function
+  (`app/customize/ordering.py`), so the API and the screen cannot disagree.
+- **Backend, profiles** (`app/profiles/`): `GET`/`POST`/`PATCH`/`DELETE /v1/profiles` — the
+  caller’s account row plus any number of child viewers. The account row is editable but never
+  deletable (that would orphan the subscription), so DELETE only ever removes an extra viewer.
+- **Android:** `CustomizeScreen` (reorder / pin / hide, three controls per row so UP/DOWN walk one
+  column) and `ProfilesScreen` (rename via the system IME, add / switch / delete).
+- **Schema:** migration `008_m14_customization_profiles.sql`.
+
+**Tests (Slices C + D):** Android `GuideGridTest` (14), `CustomizeItemsTest` (14),
+`EpgTimeFormatTest` (8); backend `test_epg_service.py`, `test_customize_ordering.py`,
+`test_customize_service.py`, `test_catalog_customization.py`, `test_customize_profiles_api.py`,
+`test_profiles_service.py`.
+
+### Phase 1 — Reproducibility: Schema Migration Runner ✅ COMPLETE (2026-10-02)
+- **The gap:** `tavuno-control/migrations/` held eight hand-written SQL files and there was no
+  runner anywhere in the repository — a fresh clone had no supported path to a working schema, and
+  nothing recorded which files a given database had already seen.
+- **The runner:** `app/db_migrations.py` discovers the SQL files in filename order (the zero-padded
+  prefix *is* the order), keeps a `tavuno_schema_migrations` ledger, and applies only what is
+  pending. It runs from the API’s lifespan when `TAVUNO_AUTO_MIGRATE=true`, and a failure is fatal
+  rather than leaving a half-migrated server answering traffic.
+- **No baseline stamping needed:** every migration guards its own statements (`IF NOT EXISTS` /
+  `ON CONFLICT`), so replaying the whole set against a hand-migrated database is a no-op. The runner
+  can therefore start from an empty ledger anywhere, with no "mark everything as applied" step.
+- **It patches — it does not bootstrap:** the tables these files alter (`tavuno_profiles`,
+  `tavuno_devices`, `tavuno_plans`, `tavuno_categories`, `tavuno_channels`, `tavuno_channel_sources`)
+  are created by the Directus base schema, `tavuno-infra/scripts/apply-m2-schema.ps1`, not by any
+  migration. Run the set against a database where that has never executed and `001` fails with
+  `relation "tavuno_profiles" does not exist`. `tests/test_migrations_live.py` pins that failure and
+  the full apply either side of it, against a real PostgreSQL 17.11 server.
+- **Second bug found and fixed:** replaying the set against the live database exposed that
+  `006_m12_vod_schema.sql` was not re-runnable either, for two reasons. It declared `category_id`
+  where `catalog/service.py` and `sync_service.py` both read and write `category`; and
+  `CREATE TABLE IF NOT EXISTS` leaves an already-existing table untouched, so such a table had
+  none of the `category` / `external_id` / `updated_at` / `stream_url` columns that the file's own
+  indexes and triggers then referenced. Both `category_id` uses are renamed, and a reconciliation
+  block of `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` now runs before the indexes — so the file
+  converges whether the table is new or predates the file.
+- **Bug found and fixed:** `003_m11_sports_schema.sql` created its three triggers without dropping
+  them first. `CREATE TRIGGER` has no `IF NOT EXISTS`, so replaying that file against a database
+  that already had the sports tables failed with "trigger ... already exists" — it was the one
+  migration that was not actually re-runnable. It now uses `006`’s drop-then-create pattern, and
+  `PackagedMigrationsAreRerunnableTests` fails the build if a future migration repeats the mistake.
+- **Packaging:** the `Dockerfile` now copies `migrations/` beside `app/` (it previously copied only
+  `app` and `tests`), so the container can see the SQL files.
+- **Tests:** `tests/test_migrations.py` (21 cases) — discovery order, ledger reads, apply / skip,
+  cursor draining for multi-statement scripts, connection lifecycle, and the re-runnability guards.
+
+### M16 — Monitoring & Operations ✅ COMPLETE (2026-10-02)
+- **`GET /metrics`** on `tavuno-control` (`app/metrics.py`): request count and
+  latency labelled by **route template** (never the concrete path — `/v1/channels/{channel_id}`
+  rather than `/v1/channels/123456`, with 404s collapsing into one `unmatched`
+  bucket, so neither a large catalog nor a scanner can mint time series),
+  playback sessions started and active, the app's own PostgreSQL/Redis probes,
+  and last-sync age.
+- **`tavuno_active_playback_sessions` uses the same predicate as `playback.py`**
+  (`status='active' AND last_seen_at >= NOW() - 90s`), so the dashboard cannot
+  disagree with what `max_concurrent_streams` enforces.
+- **Dispatcharr and OME are probed, not scraped, from outside.** Both go through
+  the retrying circuit breaker in `app/resilience.py`, so probing them inside
+  `/metrics` would stall the scrape that reports them. blackbox-exporter does it
+  with a 5s timeout, and its module requires `"status": "ok"` **in the body** —
+  `/v1/ome/health` answers 200 with `{"status":"unreachable"}` when OME is down,
+  so a status-code probe would have reported a dead media server as healthy.
+- **`postgres-exporter` uses `DATA_SOURCE_URI`/`USER`/`PASS`, not a URL DSN:**
+  this deployment's database password contains `#`, a URL fragment delimiter, so
+  URL-form DSNs truncate it and fail auth. v0.15.0 passes them as libpq keyword
+  parameters; v0.20.1 rebuilds a URL and fails — verified both ways. Its
+  `stat_bgwriter` collector is disabled because PostgreSQL 17 split
+  `pg_stat_bgwriter` and this exporter still reads the old view.
+- **8 alert rules** (`promtool`-validated) across availability, freshness and
+  performance. The staleness rule is guarded by `> 0` so a stack with
+  `DISPATCHARR_API_KEY` unset does not page forever for a deliberately disabled job.
+- **3 Grafana dashboards** provisioned from files (Tavuno API, Playback,
+  Infrastructure), with the datasource `uid` pinned so they bind on a fresh volume.
+- **Alertmanager is configured but delivers nowhere — deliberately.** The route
+  points at a receiver with no integrations: alerts are recorded and visible in
+  the UI, but nothing is pushed, because the repo has no SMTP
+  (`email_service.py` is a TODO stub) and an invented webhook URL would look
+  configured while silently discarding pages. Adding `webhook_configs` is the one
+  edit to enable delivery.
+- **Verified live:** 6/6 Prometheus targets up, all health gauges 1, **0 firing
+  alerts**, 3 dashboards returning data through the datasource proxy,
+  `promtool`/`amtool`/blackbox config checks all pass.
+- **Tests:** `tests/test_metrics.py` (19 cases) — route-template labelling, the
+  concrete path never appearing as a label, 404 collapsing, the endpoint
+  answering 200 with every dependency down, and timestamp parsing. Suite: **387
+  passed / 13 skipped**.
+- **Docs:** `docs/M16_Monitoring.md`.
+
 ## Incomplete Milestones
 
 ### M13 — Catch-up / DVR / Timeshift ⚠️ PARTIAL
@@ -189,12 +291,6 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 - Directus admin interface available
 - No custom admin UI
 
-### M16 — Monitoring & Operations ⚠️ PARTIAL
-- Prometheus configured
-- Grafana configured
-- No custom dashboards
-- No alerting configured
-
 ### M17 — Security Hardening ⚠️ PARTIAL
 - HTTPS needs production configuration
 - Rate limiting exists
@@ -208,8 +304,8 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 - Single instance only
 
 ### M20 — Quality / QA ⚠️ PARTIAL
-- Backend tests passing (210 passed, 8 skipped as of 2026-10-01)
-- Android tests passing
+- Backend tests passing (368 passed, 13 skipped on the host as of 2026-10-02; 372 passed, 9 skipped in-container against a live Postgres DSN)
+- Android tests passing (93 tests, 12 suites)
 - No UI automation tests
 - No load testing
 
@@ -221,6 +317,25 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 
 ## Remaining Tasks
 
-- Restyle remaining legacy screens onto the design system (LiveTv, Sports, MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login) and retire FocusableCard
-- Backend: normalize Directus poster/backdrop UUIDs to asset URLs; windowed EPG endpoint; home rails/favourites/resume
+- Restyle remaining legacy screens onto the design system (MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login) and retire FocusableCard
+- Backend: normalize Directus poster/backdrop UUIDs to asset URLs; home rails/favourites/resume
 - Real VOD content population in Dispatcharr (operator task - see docs/M12_VOD_Content_Setup.md)
+
+## Known Issues
+
+- **Two Phase 1 D-pad fixes are in code but have neither unit tests nor an emulator walk.** Settings
+  handing focus back to the row that opened a sub-screen (`restoreFocusKey` in `TavunoMainScreen` /
+  `SettingsScreen`) and the Search tab's UP/DOWN escape from the text field (`onPreviewKeyEvent` in
+  `SearchScreen`) are implemented, but no test in `src/test` or `src/androidTest` references either
+  — the 93 Android unit tests cover none of them. Both need a behavioural pass on a device (what
+  does CENTER activate?) before being called done, and the focus hand-back in particular wants a
+  regression test to lock it in.
+- **`TAVUNO_AUTO_MIGRATE` is on in the dev stack and off in the app by default** — deliberate:
+  `tavuno-infra/docker-compose.yml` and both `.env.example` files set `true` so an initialized clone
+  reaches a working schema unattended, while `app/config.py` defaults to `false` so a library-style
+  use never touches a schema on its own. Worth knowing when a deployed schema changes on its own.
+- **The runner patches the Directus base schema; it does not create it.** On a database where
+  `tavuno-infra/scripts/apply-m2-schema.ps1` has never run, startup with `TAVUNO_AUTO_MIGRATE=true`
+  fails at `001` with `relation "tavuno_profiles" does not exist`. `tavuno-control` also does not
+  `depends_on` `directus`, so that ordering is not enforced either. The failure is loud and fatal by
+  design, but a fully unattended first boot needs the base schema applied and ordered too.

@@ -1,10 +1,75 @@
 global:
   scrape_interval: 15s
-
   evaluation_interval: 15s
 
+# Alert rules live in their own file so a rule change is reviewable apart from
+# scrape topology.
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
 scrape_configs:
+  # Prometheus scraping itself is the baseline that proves the scrape loop is
+  # alive: if `up{job="prometheus"}` is 0, nothing else here can be trusted.
   - job_name: prometheus
     static_configs:
       - targets:
           - localhost:9090
+
+  # The API's own metrics: request counts/latency by route template, active
+  # playback sessions, and the app's view of PostgreSQL and Redis.
+  - job_name: tavuno-control
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - tavuno-control:8000
+
+  # Engine-level database metrics (connections, cache hit ratio, transaction
+  # rate) that the application cannot see about its own connection pooling.
+  - job_name: postgres
+    static_configs:
+      - targets:
+          - postgres-exporter:9187
+
+  - job_name: redis
+    static_configs:
+      - targets:
+          - redis-exporter:9121
+
+  # OvenMediaEngine and Dispatcharr are probed rather than scraped, for two
+  # different reasons:
+  #
+  #   * Neither exposes Prometheus metrics, so there is nothing to scrape.
+  #   * The API's own health endpoints for them are unusable as a metric
+  #     source: tavuno-control wraps those HTTP calls in a retrying circuit
+  #     breaker (3 attempts, 20s timeout for Dispatcharr), so a hung
+  #     dependency would stall the /metrics scrape itself and drop the whole
+  #     target. Monitoring must not fail the way the outage does.
+  #
+  # blackbox-exporter probes from the outside with a 5s timeout instead, and
+  # the module requires `"status": "ok"` in the body — a status code alone is
+  # not enough, because /v1/ome/health answers 200 with
+  # `{"status":"unreachable"}` when OME is down.
+  - job_name: blackbox
+    metrics_path: /probe
+    params:
+      module:
+        - tavuno_health_ok
+    static_configs:
+      - targets:
+          - http://tavuno-control:8000/v1/dispatcharr/health
+          - http://tavuno-control:8000/v1/ome/health
+    relabel_configs:
+      # The target being probed becomes the `instance` label; the address
+      # Prometheus actually connects to becomes blackbox itself.
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

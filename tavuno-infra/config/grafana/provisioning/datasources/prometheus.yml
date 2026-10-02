@@ -2,6 +2,10 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    # Pinned so provisioned dashboards can reference it by uid instead of
+    # relying on whatever Grafana would otherwise generate. Without this the
+    # dashboard JSON has to be rebound by hand on every fresh volume.
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090

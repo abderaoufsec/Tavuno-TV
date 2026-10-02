@@ -1,0 +1,18 @@
+apiVersion: 1
+
+# Dashboard provider (M16). Grafana scans the directory below on startup and
+# on a timer, so a dashboard change is a file edit plus a few seconds — no
+# clicking through the UI, and the dashboards live in review like everything
+# else in this repository.
+providers:
+  - name: tavuno
+    orgId: 1
+    folder: Tavuno
+    type: file
+    disableDeletion: false
+    # Picks up edits to the mounted JSON without a container restart.
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

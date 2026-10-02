@@ -1,0 +1,129 @@
+{
+  "uid": "tavuno-infrastructure",
+  "title": "Tavuno Infrastructure",
+  "description": "Dependency health, probes, PostgreSQL, Redis and catalog freshness (M16).",
+  "tags": ["tavuno", "m16"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Scrape targets up",
+      "description": "1 = Prometheus scraped this target successfully. If prometheus itself is 0, nothing else on this dashboard can be trusted.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "max": 1, "custom": { "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "up", "legendFormat": "{{job}} {{instance}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Application dependency probes",
+      "description": "tavuno_dependency_up is the API's own view of PostgreSQL and Redis, using the same credentials requests use.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "max": 1, "custom": { "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "tavuno_dependency_up", "legendFormat": "{{dependency}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Blackbox probes (Dispatcharr / OME)",
+      "description": "probe_success requires HTTP 200 AND \"status\": \"ok\" in the body — the OME health endpoint returns 200 even when OME is down.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "max": 1, "custom": { "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "probe_success{job=\"blackbox\"}", "legendFormat": "{{instance}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Catalog freshness",
+      "description": "Age of the last successful Dispatcharr sync. Blank when no sync has ever run (gauge is 0 by design).",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value", "colorMode": "value" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 3600 }, { "color": "red", "value": 7200 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - tavuno_dispatcharr_sync_last_success_timestamp_seconds > 0 ? time() - tavuno_dispatcharr_sync_last_success_timestamp_seconds : 0"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "PostgreSQL connections",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "pg_stat_database_numbackends{datname=\"tavuno\"}", "legendFormat": "backends" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "PostgreSQL transactions / sec",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(pg_stat_database_xact_commit{datname=\"tavuno\"}[5m])", "legendFormat": "commit" },
+        { "refId": "B", "expr": "rate(pg_stat_database_xact_rollback{datname=\"tavuno\"}[5m])", "legendFormat": "rollback" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Redis memory and clients",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 10, "lineWidth": 1 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "memory" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          { "matcher": { "id": "byName", "options": "clients" }, "properties": [{ "id": "unit", "value": "short" }] }
+        ]
+      },
+      "targets": [
+        { "refId": "A", "expr": "redis_memory_used_bytes", "legendFormat": "memory" },
+        { "refId": "B", "expr": "redis_connected_clients", "legendFormat": "clients" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Redis cache hit ratio",
+      "description": "Keyspace hits over hits+misses. A falling ratio means the catalog cache is being invalidated more often than it is being read.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(redis_keyspace_hits_total[5m])) / clamp_min(sum(rate(redis_keyspace_hits_total[5m])) + sum(rate(redis_keyspace_misses_total[5m])), 0.001)",
+          "legendFormat": "hit ratio"
+        }
+      ]
+    }
+  ]
+}

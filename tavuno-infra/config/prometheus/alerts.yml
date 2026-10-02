@@ -1,0 +1,124 @@
+# Alert rules (M16).
+#
+# Every rule here is chosen to be *actionable*: it fires on a state an operator
+# would do something about, and stays quiet on states that are normal for this
+# deployment. Two examples of that discipline:
+#
+#   * TavunoDispatcharrSyncStale is guarded by `> 0`. A stack with
+#     DISPATCHARR_API_KEY unset runs no sync by design; alerting on "never
+#     synced" would fire forever and get the whole ruleset muted.
+#   * The 5xx ratio rule divides by clamp_min(..., 0.001) so an idle stack
+#     (zero requests) does not produce a NaN rate and flap.
+
+groups:
+  - name: tavuno-availability
+    rules:
+      - alert: TavunoApiDown
+        expr: up{job="tavuno-control"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "tavuno-control is not answering scrapes"
+          description: >-
+            Prometheus has failed to scrape the API for 2 minutes. Every
+            client request is failing. Check `docker logs tavuno-control`.
+
+      - alert: TavunoDependencyDown
+        expr: tavuno_dependency_up == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "tavuno-control cannot reach {{ $labels.dependency }}"
+          description: >-
+            The API's own probe of {{ $labels.dependency }} failed at the last
+            scrape, so requests needing it are erroring.
+
+      - alert: TavunoPostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL exporter cannot reach the database"
+          description: "pg_up is 0 — the database is down or unreachable."
+
+      - alert: TavunoRedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis exporter cannot reach the cache"
+          description: >-
+            redis_up is 0. Catalog and EPG caching degrade without it; the API
+            stays up but slower.
+
+      - alert: TavunoProbeFailed
+        expr: probe_success == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Health probe failing: {{ $labels.instance }}"
+          description: >-
+            blackbox-exporter could not get a 200 with `"status": "ok"` from
+            {{ $labels.instance }}. For the OME endpoint this is the only
+            signal that sees a dead media server, because that endpoint
+            returns 200 even when OME is down.
+
+  - name: tavuno-freshness
+    rules:
+      - alert: TavunoDispatcharrSyncStale
+        expr: >-
+          tavuno_dispatcharr_sync_last_success_timestamp_seconds > 0
+          and
+          time() - tavuno_dispatcharr_sync_last_success_timestamp_seconds > 7200
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dispatcharr sync has not succeeded in over 2 hours"
+          description: >-
+            The catalog is going stale. The default sync interval is 1 hour, so
+            2 hours means at least one cycle has failed (check
+            `docker logs tavuno-control | grep -i sync`).
+
+  - name: tavuno-performance
+    rules:
+      - alert: TavunoHighErrorRate
+        expr: >-
+          sum by (job) (rate(tavuno_http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum by (job) (rate(tavuno_http_requests_total[5m])), 0.001)
+          > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 5% of API requests are failing with 5xx"
+          description: >-
+            Sustained server-error rate over the last 10 minutes. Group by
+            route to find the culprit:
+            `topk(5, sum by (route) (rate(tavuno_http_requests_total{status=~"5.."}[5m])))`.
+            Aggregated `by (job)` on purpose: that keeps the `job` label on
+            the alert so Alertmanager's inhibition rule can suppress it while
+            TavunoApiDown is firing for the same target.
+
+      - alert: TavunoPlaybackAuthorizationSlow
+        expr: >-
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(tavuno_http_request_duration_seconds_bucket{route="/v1/playback/live/{channel_id}"}[5m])
+            )
+          ) > 2.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 live-playback authorization is over 2.5s"
+          description: >-
+            Channel zapping feels broken above roughly 2s. Check Dispatcharr
+            latency and Postgres session writes.
