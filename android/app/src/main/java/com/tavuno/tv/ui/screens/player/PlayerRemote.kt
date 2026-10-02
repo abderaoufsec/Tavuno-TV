@@ -55,6 +55,9 @@ internal enum class PlayerKey {
  *   focused button, or OK would stop activating anything.
  * @param canSelectSubtitles the tuned stream carries at least one usable text track. When it does
  *   not, the SUBTITLE key falls through instead of being eaten by a no-op.
+ * @param catchupOpen the "Go back to…" catch-up picker is on screen. It is rendered inside this same
+ *   composition, so the player's preview handler is an ancestor of it and fires first: while it is
+ *   open every key must fall through to the dialog, or the picker would never see a press.
  */
 internal data class PlayerKeyContext(
     val hudVisible: Boolean,
@@ -62,12 +65,15 @@ internal data class PlayerKeyContext(
     val canZap: Boolean,
     val rootFocused: Boolean,
     val canSelectSubtitles: Boolean = false,
+    val catchupOpen: Boolean = false,
 )
 
 /**
  * The player's key map, in one place.
  *
  * Design rules, in priority order:
+ *  0. **An open catch-up picker owns everything.** It lives inside this composition, so this handler
+ *     is its ancestor and runs first; a dialog that never sees a key is worse than no dialog.
  *  1. **Media keys are global.** A remote's play/pause/stop rocker must work whether or not the HUD
  *     happens to be up, so they resolve before any state check. The SUBTITLE key rides with them,
  *     for the same reason: a viewer reaching for it mid-stream should not have to raise the controls
@@ -83,6 +89,12 @@ internal data class PlayerKeyContext(
  *     leaves the player — so a viewer can never be thrown out of a stream by a stray press.
  */
 internal fun resolvePlayerKey(keyCode: Int, context: PlayerKeyContext): PlayerKey {
+    // 0. The catch-up picker owns the remote while it is up. It renders inside this composition, so
+    //    this handler is its ancestor and runs first — every key must fall through untouched.
+    if (context.catchupOpen) {
+        return PlayerKey.Ignore
+    }
+
     // 1. Media keys — global, whatever the HUD is doing.
     when (keyCode) {
         KeyEvent.KEYCODE_MEDIA_PLAY -> return PlayerKey.Play

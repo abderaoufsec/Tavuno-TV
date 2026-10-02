@@ -96,6 +96,12 @@ fun PlayerScreen(
     contentType: String,
     contentId: String,
     playbackRepository: PlaybackRepository,
+    /**
+     * Start this many seconds behind live instead of at the live edge (the guide's "Watch from
+     * start"). Clamped to the archive window the backend grants, and honoured on the first load
+     * only -- a later zap starts at the edge as usual.
+     */
+    initialOffsetSec: Int? = null,
     onNavigateBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -106,6 +112,11 @@ fun PlayerScreen(
     var sessionId by remember { mutableStateOf<Int?>(null) }
     var dvrEnabled by remember { mutableStateOf(false) }
     var maxRewindSeconds by remember { mutableStateOf(0) }
+    // The "Go back to…" picker. It is an overlay inside this composition (not a separate dialog
+    // window) so it stays under the same focus and key handling as the rest of the player.
+    var catchupOpen by remember { mutableStateOf(false) }
+    // Taken by the first successful authorize, so a zap does not replay the entry offset.
+    var initialOffsetPending by remember { mutableStateOf(initialOffsetSec) }
     var playerError by remember { mutableStateOf<String?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
 
@@ -283,6 +294,29 @@ fun PlayerScreen(
                     exoPlayer.play()
                     if (contentType == "live") {
                         startHeartbeat(sessionId, playbackRepository, heartbeatJob, scope)
+                        // "Watch from start" from the guide: land in the archive straight away.
+                        // The offset is a request, not a promise -- clamp it to the window the
+                        // server just granted, and wait for STATE_READY before seeking, because
+                        // until then the live edge position is not known.
+                        val requested = initialOffsetPending
+                        initialOffsetPending = null
+                        val offsetSec = CatchupJumps.clampOffset(
+                            requested ?: 0,
+                            auth.playback.maxRewindSeconds,
+                        )
+                        if (offsetSec != null) {
+                            val offsetMs = offsetSec * 1000L
+                            exoPlayer.addListener(object : Player.Listener {
+                                override fun onPlaybackStateChanged(playbackState: Int) {
+                                    if (playbackState == Player.STATE_READY) {
+                                        exoPlayer.seekTo(
+                                            (exoPlayer.currentPosition - offsetMs).coerceAtLeast(0L)
+                                        )
+                                        exoPlayer.removeListener(this)
+                                    }
+                                }
+                            })
+                        }
                     }
                 }
             },
@@ -372,6 +406,31 @@ fun PlayerScreen(
         }
     }
 
+    /**
+     * Hand the D-pad back to the player once the picker is gone. The root is only re-focusable after
+     * the frame that clears [catchupOpen] has recomposed, so a same-frame request would be dropped —
+     * wait a frame, exactly as the error-panel restore does.
+     */
+    fun restoreRootFocus() {
+        scope.launch {
+            withFrameNanos { }
+            runCatching { rootFocus.requestFocus() }
+        }
+    }
+
+    /**
+     * Jump into the archive: the same seek the −30 s pill performs, just aimed. Offsets come from
+     * [CatchupJumps.optionsFor] so every row is strictly inside the window the backend granted, and
+     * the position is clamped at 0 the way the rewind path already does.
+     */
+    fun jumpToCatchup(offsetSec: Int) {
+        catchupOpen = false
+        val target = (exoPlayer.currentPosition - offsetSec * 1000L).coerceAtLeast(0L)
+        exoPlayer.seekTo(target)
+        exoPlayer.play()
+        restoreRootFocus()
+    }
+
     /** Apply a resolved key. Returns true when the press was consumed by the player. */
     fun applyPlayerKey(key: PlayerKey): Boolean = when (key) {
         PlayerKey.PrevChannel -> { zapBy(-1); true }
@@ -397,7 +456,10 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(Color.Black)
             .focusRequester(rootFocus)
-            .focusable()
+            // While the catch-up picker is open this surface is taken out of focus search: it is the
+            // dialog's ancestor, so leaving it focusable would let a directional press strand focus on
+            // the video behind the scrim. The dialog is the only focus target while it is up.
+            .focusable(enabled = !catchupOpen)
             .onFocusChanged { rootFocused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -410,6 +472,7 @@ fun PlayerScreen(
                         canZap = canZap,
                         rootFocused = rootFocused,
                         canSelectSubtitles = canSelectSubtitles,
+                        catchupOpen = catchupOpen,
                     ),
                 )
                 // A held channel key surfs the list; every other action fires once per press.
@@ -474,7 +537,7 @@ fun PlayerScreen(
                             .padding(Dimens.GapLarge),
                     )
                 }
-                if (hudVisible) {
+                if (hudVisible && !catchupOpen) {
                     PlayerHud(
                         title = navigator.playing?.name
                             ?: (if (isLive) "Live channel" else "Now playing"),
@@ -497,10 +560,22 @@ fun PlayerScreen(
                         },
                         onOpenChannels = { channelListOpen = true },
                         onToggleSubtitles = { toggleSubtitles() },
+                        onCatchup = { catchupOpen = true },
                         firstControlFocus = hudFocus,
                     )
                 }
-                if (channelListOpen && navigator.size > 0) {
+                if (catchupOpen && isLive && maxRewindSeconds > 0) {
+                    CatchupJumpOverlay(
+                        offsetsSec = CatchupJumps.optionsFor(maxRewindSeconds),
+                        windowSec = maxRewindSeconds,
+                        onPick = { offset -> jumpToCatchup(offset) },
+                        onDismiss = {
+                            catchupOpen = false
+                            restoreRootFocus()
+                        },
+                    )
+                }
+                if (channelListOpen && navigator.size > 0 && !catchupOpen) {
                     PlayerChannelOverlay(
                         channels = navigator.list,
                         playingChannelId = navigator.playing?.id ?: playingChannelId,

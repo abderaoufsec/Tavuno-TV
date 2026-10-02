@@ -68,6 +68,7 @@ internal fun PlayerHud(
     onRewind: (Long) -> Unit,
     onOpenChannels: () -> Unit,
     onToggleSubtitles: () -> Unit,
+    onCatchup: () -> Unit,
     firstControlFocus: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
@@ -106,6 +107,7 @@ internal fun PlayerHud(
             onRewind = onRewind,
             onOpenChannels = onOpenChannels,
             onToggleSubtitles = onToggleSubtitles,
+            onCatchup = onCatchup,
             firstControlFocus = firstControlFocus,
         )
     }
@@ -179,6 +181,7 @@ private fun PlayerHudControls(
     onRewind: (Long) -> Unit,
     onOpenChannels: () -> Unit,
     onToggleSubtitles: () -> Unit,
+    onCatchup: () -> Unit,
     firstControlFocus: FocusRequester,
 ) {
     val colors = TavunoTheme.colors
@@ -252,6 +255,13 @@ private fun PlayerHudControls(
             }
 
             if (dvrEnabled) {
+                // Jump into the archive rather than nudging toward it: reaching three hours back
+                // with −30 s presses means holding a key while a counter crawls.
+                TavunoButton(
+                    label = "Go back to…",
+                    onClick = onCatchup,
+                    style = TavunoButtonStyle.SECONDARY,
+                )
                 HudStepButton(
                     label = "−30s",
                     icon = Icons.Filled.Replay30,

@@ -341,7 +341,9 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
 - Phase 1 "Timeshift / Live Rewind (DVR)" is in main history (commit b4712ac)
 - Dual playback modes implemented: DIRECT_HLS and OME_DVR (commit b12df0a)
 - Player offers DVR seek-back affordances (-30s/-10s)
-- Remaining: catch-up from EPG, full DVR window management, operator-facing DVR config
+- Remaining: full DVR window management, operator-facing DVR config
+- Catch-up is implemented in the Android player: a "Go back to..." picker (offset list + exact-time wheels) driven by the DVR window the backend grants, with the windowing rules in pure, unit-tested logic (`CatchupJumps`, `CatchupContinue`)
+- Catch-up from the EPG: the guide's detail strip offers "Watch from start" for a programme that is on right now, and the player enters the archive straight away
 
 ### M14 — Subscription System ⚠️ PARTIAL
 - Backend subscription system exists

@@ -45,6 +45,11 @@ fun TavunoMainScreen(
     onNavigateToMovieDetails: (Int) -> Unit,
     onNavigateToSeriesDetails: (Int) -> Unit,
     onNavigateToPlayer: (String, Int) -> Unit,
+    /**
+     * EPG catch-up: tune [Int] channelId and start [Int] offsetSec behind live. Separate from
+     * [onNavigateToPlayer] so the movie/episode callers are untouched.
+     */
+    onWatchFromStart: (channelId: Int, offsetSec: Int) -> Unit,
     onLogout: () -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(TavunoTab.HOME) }
@@ -111,6 +116,7 @@ fun TavunoMainScreen(
             TavunoTab.GUIDE -> GuideScreen(
                 catalogRepository = AppModule.catalogRepository,
                 onNavigateToPlayer = { channelId -> onNavigateToPlayer("live", channelId) },
+                onWatchFromStart = onWatchFromStart,
             )
 
             TavunoTab.SPORTS -> SportsScreen(

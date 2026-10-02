@@ -2,9 +2,11 @@ package com.tavuno.tv.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.tavuno.tv.ui.screens.auth.LoginScreen
 import com.tavuno.tv.ui.screens.movies.MovieDetailsScreen
 import com.tavuno.tv.ui.screens.player.PlayerScreen
@@ -21,7 +23,18 @@ sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Login : Screen("login")
     object Main : Screen("main")
-    object Player : Screen("player")
+    object Player : Screen("player") {
+        /**
+         * [startOffsetSec] is how far back from live playback should begin (EPG "watch from
+         * start"); omitted or non-positive means "at the live edge", and no query param is added.
+         */
+        fun createRoute(contentType: String, contentId: Any, startOffsetSec: Int? = null): String =
+            if (startOffsetSec != null && startOffsetSec > 0) {
+                "$route/$contentType/$contentId?offset=$startOffsetSec"
+            } else {
+                "$route/$contentType/$contentId"
+            }
+    }
 
     object MovieDetails : Screen("movie/{movieId}") {
         fun createRoute(movieId: Int) = "movie/$movieId"
@@ -77,7 +90,12 @@ fun TavunoNavigation(
                     navController.navigate(Screen.SeriesDetails.createRoute(seriesId))
                 },
                 onNavigateToPlayer = { type, id ->
-                    navController.navigate(Screen.Player.route + "/$type/$id")
+                    navController.navigate(Screen.Player.createRoute(type, id))
+                },
+                onWatchFromStart = { channelId, offsetSec ->
+                    navController.navigate(
+                        Screen.Player.createRoute("live", channelId, offsetSec)
+                    )
                 },
                 onLogout = {
                     // Free launch has no login screen to fall back to:
@@ -98,7 +116,7 @@ fun TavunoNavigation(
                 playbackRepository = com.tavuno.tv.core.AppModule.playbackRepository,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToPlayer = { type, id ->
-                    navController.navigate(Screen.Player.route + "/$type/$id")
+                    navController.navigate(Screen.Player.createRoute(type, id))
                 }
             )
         }
@@ -123,18 +141,27 @@ fun TavunoNavigation(
                 playbackRepository = com.tavuno.tv.core.AppModule.playbackRepository,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToPlayer = { type, id ->
-                    navController.navigate(Screen.Player.route + "/$type/$id")
+                    navController.navigate(Screen.Player.createRoute(type, id))
                 }
             )
         }
 
-        composable(Screen.Player.route + "/{contentType}/{contentId}") { backStackEntry ->
+        composable(
+            route = Screen.Player.route + "/{contentType}/{contentId}?offset={offset}",
+            arguments = listOf(
+                // -1 = "no offset requested": query params must have a default so the plain
+                // player/… route keeps matching every existing caller.
+                navArgument("offset") { type = NavType.IntType; defaultValue = -1 },
+            ),
+        ) { backStackEntry ->
             val contentType = backStackEntry.arguments?.getString("contentType") ?: "live"
             val contentId = backStackEntry.arguments?.getString("contentId") ?: "0"
+            val offset = backStackEntry.arguments?.getInt("offset") ?: -1
             PlayerScreen(
                 contentType = contentType,
                 contentId = contentId,
                 playbackRepository = com.tavuno.tv.core.AppModule.playbackRepository,
+                initialOffsetSec = offset.takeIf { it > 0 },
                 onNavigateBack = { navController.popBackStack() }
             )
         }

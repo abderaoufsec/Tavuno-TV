@@ -53,6 +53,7 @@ import com.tavuno.tv.ui.components.LoadingState
 import com.tavuno.tv.ui.components.TavunoButton
 import com.tavuno.tv.ui.components.TavunoButtonStyle
 import com.tavuno.tv.ui.screens.live.EpgTimeFormat
+import com.tavuno.tv.ui.screens.player.CatchupJumps
 import com.tavuno.tv.ui.theme.Dimens
 import com.tavuno.tv.ui.theme.TavunoTheme
 import kotlinx.coroutines.flow.first
@@ -94,11 +95,16 @@ data class FocusedCell(val channel: GuideChannel, val program: EpgProgram?)
  *    drives both scroll positions from the focused cell itself.
  *  - **the channel column is focusable too.** A channel with no synced EPG has no programme
  *    cell to land on, so it would be unreachable; its row doubles as a one-press tune target.
+ *
+ *  - **catch-up from the grid.** The detail strip adds "Watch from start" for a programme that
+ *    is on right now, handing the player the offset to that programme's first minute.
  */
 @Composable
 fun GuideScreen(
     catalogRepository: CatalogRepository,
     onNavigateToPlayer: (Int) -> Unit,
+    /** Catch-up entry: tune [Int] channelId and start [Int] offsetSec behind live. */
+    onWatchFromStart: (channelId: Int, offsetSec: Int) -> Unit,
 ) {
     val zone = remember { ZoneId.systemDefault() }
     // Anchored once, at entry: re-deriving the window on every recomposition would slide the
@@ -141,7 +147,21 @@ fun GuideScreen(
             onRefresh = { reloadKey++ },
         )
 
-        GuideDetailStrip(focused = focused, zone = zone)
+        GuideDetailStrip(
+            focused = focused,
+            zone = zone,
+            onWatchFromStart = { offsetSec ->
+                focused?.let { cell ->
+                    // Arm the zap list exactly as a plain tune does, so CH± works after the
+                    // viewer lands in the archive.
+                    LiveChannelQueue.publish(
+                        channels = channels.map { it.toZapChannel() },
+                        currentChannelId = cell.channel.id,
+                    )
+                    onWatchFromStart(cell.channel.id, offsetSec)
+                }
+            },
+        )
 
         when {
             isLoading -> LoadingState("Loading the guide...")
@@ -233,7 +253,11 @@ private fun GuideHeader(
  * the viewer moved off a programme — and it falls back to a hint until something is focused.
  */
 @Composable
-private fun GuideDetailStrip(focused: FocusedCell?, zone: ZoneId) {
+private fun GuideDetailStrip(
+    focused: FocusedCell?,
+    zone: ZoneId,
+    onWatchFromStart: (offsetSec: Int) -> Unit,
+) {
     val colors = TavunoTheme.colors
     val channel = focused?.channel
     val program = focused?.program
@@ -306,6 +330,28 @@ private fun GuideDetailStrip(focused: FocusedCell?, zone: ZoneId) {
                     color = colors.primary,
                     maxLines = 1,
                 )
+                // Catch-up: a programme that is on right now can be restarted from its first
+                // minute. The guide has no way to know how deep this channel's archive is -- that
+                // only arrives with playback authorization -- so the raw offset travels to the
+                // player, which clamps it to the window the server actually granted.
+                val startMs = EpgTimeFormat.parseInstant(program.startsAt)?.toEpochMilli()
+                val endMs = EpgTimeFormat.parseInstant(program.endsAt)?.toEpochMilli()
+                if (startMs != null && endMs != null &&
+                    System.currentTimeMillis() in startMs until endMs
+                ) {
+                    Spacer(Modifier.width(Dimens.GapMedium))
+                    TavunoButton(
+                        label = "Watch from start",
+                        onClick = {
+                            // Re-read the clock on press: the strip was composed when the cell
+                            // was focused, which may have been minutes ago.
+                            CatchupJumps.offsetForStart(startMs, System.currentTimeMillis())
+                                ?.let(onWatchFromStart)
+                        },
+                        style = TavunoButtonStyle.PRIMARY,
+                        compact = true,
+                    )
+                }
             }
         }
     }
