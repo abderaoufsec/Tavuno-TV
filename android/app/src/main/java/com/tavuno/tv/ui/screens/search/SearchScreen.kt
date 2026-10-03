@@ -41,7 +41,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -121,6 +124,17 @@ fun SearchScreen(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
 
+    // The only place "is the keyboard on screen" can be answered live. Compose's
+    // `WindowInsets.isImeVisible` never settles back to false on this TV build, and any value
+    // remembered between presses goes stale exactly when it matters: the IME window hides itself
+    // without telling the app, so a remembered `true` outlives the keyboard. The window insets are
+    // read at the moment of the press instead, which is exact — see `SearchBack`.
+    val view = LocalView.current
+    val imeIsOnScreen = {
+        ViewCompat.getRootWindowInsets(view)
+            ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -128,14 +142,36 @@ fun SearchScreen(
             .padding(Dimens.GapSmall)
             // Escape hatch for the search field, which is otherwise a dead end for a remote.
             // Two things eat the arrow keys, in order: while the soft keyboard is up it owns
-            // them outright (they never reach Compose, so BACK — handled by the system —
-            // dismisses the keyboard first); once the keyboard is gone the text field itself
-            // keeps UP/DOWN for cursor movement, so focus still could not leave it and the
-            // results below stayed unreachable. Preview handlers run root-to-focused-node, so
-            // this sees the key before the field does. LEFT/RIGHT are deliberately left alone
-            // so the cursor can still be nudged inside the query.
+            // them outright (they never reach Compose); once the keyboard is gone the text field
+            // itself keeps UP/DOWN for cursor movement, so focus still could not leave it and the
+            // results below stayed unreachable. Preview handlers run root-to-focused-node, so this
+            // sees the key before the field does. LEFT/RIGHT are deliberately left alone so the
+            // cursor can still be nudged inside the query.
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // BACK is a ladder, and the keyboard is its lowest rung. The IME window normally
+                // hides itself on that press and never hands it on — which is the behaviour we
+                // want, and nothing here needs to run for it. This guard is what keeps a press
+                // that *does* reach the app (a keyboard that does not swallow BACK, or a press
+                // racing the keyboard's own teardown) from falling through to the shell and
+                // navigating to Home mid-query.
+                //
+                // Read live, never remembered: a value cached from focus goes stale the moment the
+                // IME hides itself, and a stale `true` then eats the *next* press — the viewer has
+                // to press BACK twice to leave Search. Once the keyboard is down this returns
+                // `false`, so the press reaches the shell untouched and the rest of the ladder runs
+                // exactly as it did before this screen grew a keyboard. Any stale read only has to
+                // outlive one press, so the window insets are as fresh as they need to be.
+                if (event.key == Key.Back) {
+                    return@onPreviewKeyEvent when (resolveSearchBack(imeVisible = imeIsOnScreen())) {
+                        SearchBackAction.DismissIme -> {
+                            keyboard?.hide()
+                            true
+                        }
+                        // `false` hands the press to the shell's own ladder.
+                        SearchBackAction.FallThroughToShell -> false
+                    }
+                }
                 val direction = when (event.key) {
                     Key.DirectionDown -> FocusDirection.Down
                     Key.DirectionUp -> FocusDirection.Up

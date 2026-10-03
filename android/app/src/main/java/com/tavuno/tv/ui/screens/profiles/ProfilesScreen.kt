@@ -241,8 +241,14 @@ fun ProfilesScreen(
                         message = "Add a profile to start splitting this account between viewers.",
                     )
                 } else {
+                    // weight(1f), not fillMaxSize(): this Column also holds the header Row and the
+                    // optional add/empty panels above, so fillMaxSize() would measure the list
+                    // against the Column's full height and overflow it, breaking vertical focus
+                    // traversal below the first row.
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
                         contentPadding = PaddingValues(vertical = Dimens.GapTiny),
                         verticalArrangement = Arrangement.spacedBy(Dimens.GapTiny),
                     ) {

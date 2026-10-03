@@ -1,5 +1,6 @@
 package com.tavuno.tv.ui.screens.player
 
+import android.view.KeyEvent
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +69,14 @@ import kotlinx.coroutines.launch
 
 /** The control strip retires itself so a stream never sits under a button bar forever. */
 private const val HUD_AUTO_HIDE_MS = 8_000L
+
+/** The keys that activate whatever control owns focus (the remote's OK family). */
+private val OK_KEYS = setOf(
+    KeyEvent.KEYCODE_DPAD_CENTER,
+    KeyEvent.KEYCODE_ENTER,
+    KeyEvent.KEYCODE_NUMPAD_ENTER,
+    KeyEvent.KEYCODE_SPACE,
+)
 
 /** How often the on-screen channel's now/next guide data is re-read (matches the API cache). */
 private const val EPG_REFRESH_INTERVAL_MS = 60_000L
@@ -229,6 +238,12 @@ fun PlayerScreen(
     val rootFocus = remember { FocusRequester() }
     val hudFocus = remember { FocusRequester() }
     val errorFocus = remember { FocusRequester() }
+
+    // Set when this surface consumed an OK key-down (ToggleHud/FocusHud run on key-down). The
+    // paired key-up must be swallowed with it: by then FocusHud may have focused a HUD control,
+    // and an orphan key-up landing on that control would activate it - pressing OK to enter the
+    // strip would instead fire the first control (Back) and navigate out of the player.
+    var consumedOkDown by remember { mutableStateOf(false) }
 
     // Guide data for the HUD/overlay: the tuned channel always, plus whatever the channel list can
     // show when it opens. Failures are silently tolerated — playback never waits on this.
@@ -456,14 +471,30 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(Color.Black)
             .focusRequester(rootFocus)
+            // onFocusChanged must sit BEFORE focusable to observe this Box's *own* focus state.
+            // After focusable it only sees children (strip controls), which left rootFocused=false
+            // while the root held focus: the second OK then resolved to Ignore instead of
+            // FocusHud, its unconsumed key-up leaked to the strip's Back control and popped the
+            // player out of the stream.
+            .onFocusChanged { rootFocused = it.isFocused }
             // While the catch-up picker is open this surface is taken out of focus search: it is the
             // dialog's ancestor, so leaving it focusable would let a directional press strand focus on
             // the video behind the scrim. The dialog is the only focus target while it is up.
             .focusable(enabled = !catchupOpen)
-            .onFocusChanged { rootFocused = it.isFocused }
             .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val native = event.nativeKeyEvent
+                if (event.type == KeyEventType.KeyUp) {
+                    // A consumed OK key-down takes its key-up with it; see consumedOkDown.
+                    if (native.keyCode in OK_KEYS && consumedOkDown) {
+                        consumedOkDown = false
+                        return@onPreviewKeyEvent true
+                    }
+                    return@onPreviewKeyEvent false
+                }
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // Any new key-down ends a pair whose key-up never arrived (e.g. focus left the
+                // window mid-press), so a stale flag can never swallow a later press's key-up.
+                consumedOkDown = false
                 val key = resolvePlayerKey(
                     keyCode = native.keyCode,
                     context = PlayerKeyContext(
@@ -478,7 +509,9 @@ fun PlayerScreen(
                 // A held channel key surfs the list; every other action fires once per press.
                 val isZapKey = key == PlayerKey.PrevChannel || key == PlayerKey.NextChannel
                 if (native.repeatCount > 0 && !isZapKey) return@onPreviewKeyEvent false
-                applyPlayerKey(key)
+                val consumed = applyPlayerKey(key)
+                if (consumed && native.keyCode in OK_KEYS) consumedOkDown = true
+                consumed
             },
     ) {
         AndroidView(

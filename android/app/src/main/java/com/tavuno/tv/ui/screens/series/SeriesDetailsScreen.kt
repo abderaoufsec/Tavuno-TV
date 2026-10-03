@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -28,7 +29,9 @@ import com.tavuno.tv.data.model.SeasonDetails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.tavuno.tv.ui.theme.Dimens
 import com.tavuno.tv.ui.theme.TavunoSecondary
+import com.tavuno.tv.ui.theme.TavunoTheme
 
 @Composable
 fun SeriesDetailsScreen(
@@ -155,12 +158,18 @@ fun SeriesDetailsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(details.seasons) { season ->
-                                com.tavuno.tv.ui.components.FocusableCard(
+                                com.tavuno.tv.ui.components.FocusableSurface(
                                     onClick = { onNavigateToSeason(season.id) },
-                                    modifier = Modifier.height(80.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(80.dp),
+                                    unfocusedContainerColor = TavunoTheme.colors.card,
+                                    contentAlignment = Alignment.CenterStart,
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxSize(),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(Dimens.GapMedium),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {

@@ -240,8 +240,15 @@ fun CustomizeScreen(
                     )
                 }
 
+                // weight(1f), not fillMaxSize(): this Column also holds the header Row above, and
+                // fillMaxSize() would measure the list against the Column's full height instead of
+                // the space left after the header. That overflowed the container, pushed rows past
+                // the panel bounds and left vertical focus traversal with nowhere to go below the
+                // first row, so the screen read as one stranded row.
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
                     contentPadding = PaddingValues(vertical = Dimens.GapTiny),
                     verticalArrangement = Arrangement.spacedBy(Dimens.GapTiny),
                 ) {

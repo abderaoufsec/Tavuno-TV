@@ -2,6 +2,21 @@ package com.tavuno.tv.data.model
 
 import com.google.gson.annotations.SerializedName
 
+/**
+ * Per-item viewer state the API projects onto every catalog read (backend A6).
+ *
+ * Null on a model built before this field existed, and Gson leaves it null when
+ * the API omits it, so `item.viewer?.isFavourite == true` is the only safe read.
+ */
+data class ViewerState(
+    @SerializedName("is_favourite")
+    val isFavourite: Boolean = false,
+    /** 0..1 resume position, or null when there is no bar to draw (live content). */
+    val progress: Float? = null,
+    @SerializedName("position_ms")
+    val positionMs: Long = 0L
+)
+
 data class Channel(
     val id: Int,
     val name: String,
@@ -10,7 +25,8 @@ data class Channel(
     val categoryId: Int?,
     val logo: String?,
     @SerializedName("is_active")
-    val isActive: Boolean
+    val isActive: Boolean,
+    val viewer: ViewerState? = null
 )
 
 data class ChannelDetails(
@@ -52,9 +68,11 @@ data class Movie(
     val releaseYear: Int?,
     @SerializedName("is_active")
     val isActive: Boolean,
-    // Present once the API normalizes Directus file UUIDs into URLs (backend Stage 3.1); absent
-    // today, in which case Gson leaves it null and PosterCard draws its tonal placeholder.
-    val poster: String? = null
+    // Populated by the API as a Directus /assets/<uuid> URL (backend A6); absent
+    // today, in which case Gson leaves it null and PosterCard draws its tonal
+    // placeholder.
+    val poster: String? = null,
+    val viewer: ViewerState? = null
 )
 
 data class MovieDetails(
@@ -88,7 +106,8 @@ data class Series(
     @SerializedName("is_active")
     val isActive: Boolean,
     // Same forward-compatibility note as [Movie.poster].
-    val poster: String? = null
+    val poster: String? = null,
+    val viewer: ViewerState? = null
 )
 
 /**
@@ -156,9 +175,96 @@ data class EpisodeDetails(
     val playbackAvailable: Boolean
 )
 
+/**
+ * `GET /v1/home` (backend A6).
+ *
+ * The four rails the home screen renders. `continueWatching` and `favourites`
+ * are always present — empty lists for a profile with nothing stored — so no
+ * screen has to null-check them; the API guarantees the keys.
+ */
 data class HomeData(
     val channels: List<Channel>,
     val categories: List<Category>,
     val movies: List<Movie>,
-    val series: List<Series>
+    val series: List<Series>,
+    @SerializedName("continue_watching")
+    val continueWatching: List<HomeRailItem> = emptyList(),
+    val favourites: List<HomeRailItem> = emptyList()
+)
+
+/**
+ * One entry on a personal home rail: the catalog item plus the state that put it
+ * there. `kind` is which table the id came from (`channel`/`movie`/`series`),
+ * which a client needs in order to pick the item back up.
+ */
+data class HomeRailItem(
+    val id: Int,
+    val kind: String,
+    val title: String? = null,
+    val name: String? = null,
+    val poster: String? = null,
+    val logo: String? = null,
+    val progress: Float? = null,
+    @SerializedName("position_ms")
+    val positionMs: Long? = null
+)
+
+/** `GET /v1/favourites/{kind}` — the profile's favourites for one kind. */
+data class FavouriteList(
+    val kind: String,
+    val items: List<HomeRailItem> = emptyList()
+)
+
+/**
+ * A toggle request. Leaving [isFavourite] null asks the API to flip the current
+ * value, so the client never has to read the row to know what the heart does.
+ */
+data class FavouriteToggle(
+    val kind: String,
+    @SerializedName("item_id")
+    val itemId: Int,
+    @SerializedName("is_favourite")
+    val isFavourite: Boolean? = null
+)
+
+/** The stored flag, plus the resolved item so the UI can render it immediately. */
+data class FavouriteState(
+    val kind: String,
+    @SerializedName("item_id")
+    val itemId: Int,
+    @SerializedName("is_favourite")
+    val isFavourite: Boolean,
+    val item: HomeRailItem? = null
+)
+
+/** `GET /v1/resume` — continue-watching entries, most recent first. */
+data class ProgressList(
+    val items: List<HomeRailItem> = emptyList()
+)
+
+/** One item's stored position. */
+data class ProgressPayload(
+    val kind: String,
+    @SerializedName("item_id")
+    val itemId: Int,
+    @SerializedName("position_ms")
+    val positionMs: Long = 0L,
+    @SerializedName("duration_ms")
+    val durationMs: Long = 0L,
+    /** Null means "no bar": live content has no duration. */
+    val progress: Float? = null
+)
+
+/**
+ * Report a playback position. A 204 answer means the write *cleared* the row
+ * (finished, or rewound to the start), which is a success.
+ */
+data class ProgressUpdate(
+    val kind: String,
+    @SerializedName("item_id")
+    val itemId: Int,
+    @SerializedName("position_ms")
+    val positionMs: Long,
+    @SerializedName("duration_ms")
+    val durationMs: Long = 0L
 )
