@@ -113,7 +113,7 @@ The following authentication/authorization defects identified before M9 were rem
 - Sidebar initial focus lands on content (LEFT reaches the rail); Settings "Back to Home" uses SECONDARY button style
 - Phone bridge verified: E2E D-pad login → shell → Home → Settings on emulator, zero FATALs
 - New unit test: EpgTimeFormatTest; `gradlew test assembleDebug` BUILD SUCCESSFUL (0 errors)
-- Remaining (tracked as follow-up stages): LiveTv, Sports, MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login still on legacy layout/FocusableCard; FocusableCard retirement gate
+- Remaining (tracked as follow-up stages): LiveTv, Sports, MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login still on legacy layout/legacy card component; focus-card retirement gate
 
 ### Playback Guest-Mode Fix + Live Test Scope ✅ COMPLETE (2026-10-01)
 **Symptom:** opening any stream showed *"No access token available"* and the player never started.
@@ -192,10 +192,60 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
   column) and `ProfilesScreen` (rename via the system IME, add / switch / delete).
 - **Schema:** migration `008_m14_customization_profiles.sql`.
 
+### OwnTV Parity Port — Slice F: Viewer State & Artwork ✅ COMPLETE (2026-10-03)
+- **Favourites** (`/v1/favourites`, migration `009`): a per-profile flag per
+  `(kind, item_id)`, deliberately *not* folded into `tavuno_customizations` — that
+  table owns rail order/visibility, and making "favourite" mean two things would
+  make "still a favourite, just not first" inexpressible. Writes are idempotent
+  upserts, so a double-tapped heart is a no-op rather than a 500.
+- **Resume** (`/v1/resume`): a durable per-profile position, deliberately *not*
+  written to `tavuno_playback_sessions` — that is an authorization lease the
+  reaper deletes, so progress recorded there would vanish minutes later. Past 95%
+  (finished) or back at 0 (rewound) the row is cleared, because a "continue
+  watching" rail full of 99% bars is noise.
+- **Home rails**: `/v1/home` now answers `channels`/`categories`/`movies`/`series`
+  — the shape the Android client has always modeled — plus `continue_watching` and
+  `favourites`. The change is **additive**: `featured_channels` is still returned
+  as an alias, because removing it would break callers outside this repo while
+  adding keys breaks nobody (Gson ignores absent keys).
+- **Directus UUIDs → asset URLs** (`app/assets.py`): the artwork columns hold a
+  `directus_files` relation, so the stored value is a bare UUID and an image loader
+  silently renders a placeholder. Reads now normalize it to `<base>/assets/<uuid>`
+  via `DIRECTUS_PUBLIC_URL`, and the sync writes the references it previously
+  dropped. Live-stack verification caught a bug unit tests could not: a Postgres
+  `uuid` column comes back from psycopg as `uuid.UUID`, not `str`, so the first
+  version of the mapper passed every test and returned `None` for every real row.
+- **Tests:** backend `test_assets.py`, `test_favourites_resume.py`,
+  `test_favourites_resume_api.py`, `test_home_rails.py` (66 new cases);
+  `tools/verify_a6.py` drives the live stack end-to-end. Backend suite: 480 passed
+  / 13 skipped.
+
 **Tests (Slices C + D):** Android `GuideGridTest` (14), `CustomizeItemsTest` (14),
 `EpgTimeFormatTest` (8); backend `test_epg_service.py`, `test_customize_ordering.py`,
 `test_customize_service.py`, `test_catalog_customization.py`, `test_customize_profiles_api.py`,
 `test_profiles_service.py`.
+
+### OwnTV Parity Port — Slice E: D-pad Behavioural Coverage ✅ COMPLETE (2026-10-03)
+- **`DPadNavigationTest` / `DvrRewindTest` are real instrumented tests, not compile-only stubs.**
+  Presses go through `UiAutomation.injectInputEvent` as genuine `KeyEvent`s — the same path a
+  remote's key takes into the window — so `onPreviewKeyEvent` resolution, focus traversal, click
+  activation and the HUD all see the real thing. Focus ownership is read geometrically (the
+  smallest focused node plus the labels its bounds contain), because a `FocusableSurface` never
+  merges its label into the focused node.
+- **Coverage:** a cold start has no focus owner until the first press; the rail walk and the Home
+  tiles; rail activation, channel-row focus and DOWN through the `LazyColumn`; BACK unwinds the
+  tab to Home; CENTER tunes, the first OK reveals the strip, the second enters it and BACK is a
+  ladder; and a −30s DVR seek measured on the real `ExoPlayer` behind a real DVR window
+  (`tavuno-infra\start_dvr_test_stream.ps1` publishes a looping stream into OME).
+- **Two product bugs fell out of that walk, both fixed:**
+  1. An OK key-down that `FocusHud` consumed left an orphan key-up; focus had already moved onto
+     the strip's first control by then, so that key-up *activated Back* and popped the player out
+     of the stream. `PlayerScreen` now carries the paired key-up with the key-down
+     (`consumedOkDown`).
+  2. `onFocusChanged` sat after `focusable`, so it observed the strip's controls instead of the
+     player's own `Box`: `rootFocused` read `false` while the root held focus, the second OK
+     resolved to `Ignore` instead of `FocusHud`, and the unconsumed key pair leaked into the strip
+     (same visible pop). Moving the modifier in front of `focusable` restores the real signal.
 
 ### Phase 1 — Reproducibility: Schema Migration Runner ✅ COMPLETE (2026-10-02)
 - **The gap:** `tavuno-control/migrations/` held eight hand-written SQL files and there was no
@@ -378,15 +428,11 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
   recording infrastructure.
 - **M14 is deferred by decision, not blocked.** Free launch means no billing;
   `AUTH_OPEN_ACCESS` already bypasses entitlement checks in `playback.py`.
-- Retire `FocusableCard`: still used by `SeriesDetailsScreen` and
-  `SeasonEpisodesScreen`. Move the remaining legacy screens onto the design
-  system (MovieDetails, SeriesDetails, SeasonEpisodes, Player, Splash, Login).
-- D-pad regression tests: `DPadNavigationTest.kt` / `DvrRewindTest.kt` currently
-  only compile. The custom `onPreviewKeyEvent` handling means Compose's
-  `performKeyPress` reaches the field before the IME, so "does DOWN escape the
-  search field" is testable — unlike the real remote path.
-- Backend: normalize Directus poster/backdrop UUIDs to asset URLs; home
-  rails/favourites/resume.
+- D-pad regression tests: `DPadNavigationTest.kt` / `DvrRewindTest.kt` are now behavioural
+  instrumented tests (Slice E) — real key events through the emulator's input pipeline. The
+  Search tab's "does DOWN escape the text field" case is the obvious next one: Compose's
+  `performKeyPress` reaches the field before the IME, so it needs that injection path rather than
+  the remote-style `KeyEvent` the current suite uses.
 - Real VOD content population in Dispatcharr (operator task - see docs/M12_VOD_Content_Setup.md)
 - Rotate the four default secrets before any public exposure (see
   `docs/M17_Security_Hardening.md`).
@@ -397,9 +443,9 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
   handing focus back to the row that opened a sub-screen (`restoreFocusKey` in `TavunoMainScreen` /
   `SettingsScreen`) and the Search tab's UP/DOWN escape from the text field (`onPreviewKeyEvent` in
   `SearchScreen`) are implemented, but no test in `src/test` or `src/androidTest` references either
-  — the 93 Android unit tests cover none of them. Both need a behavioural pass on a device (what
-  does CENTER activate?) before being called done, and the focus hand-back in particular wants a
-  regression test to lock it in.
+  — the 118 Android unit tests cover none of them. Slice E's emulator harness is where both belong
+  now; each still needs a behavioural pass (what does CENTER activate?) before being called done,
+  and the focus hand-back in particular wants a regression test to lock it in.
 - **`TAVUNO_AUTO_MIGRATE` is on in the dev stack and off in the app by default** — deliberate:
   `tavuno-infra/docker-compose.yml` and both `.env.example` files set `true` so an initialized clone
   reaches a working schema unattended, while `app/config.py` defaults to `false` so a library-style

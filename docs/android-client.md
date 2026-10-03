@@ -120,7 +120,7 @@ All API responses are mapped to Kotlin data classes in `data/model/`:
 12. **SettingsScreen**: Account settings and logout - IMPLEMENTED
 
 ### Reusable Components
-- `FocusableCard`: TV-optimized card with focus handling
+- `FocusableSurface`: design-system focus surface with shared focus ring/glow/scale handling
 - `ErrorState`: Consistent error display with retry
 - `LoadingState`: Loading indicator with message
 - `EmptyState`: Empty content display
