@@ -248,7 +248,10 @@ class RealisticRecordingConnection:
                     "category": self.parameters[2],
                     "synopsis": self.parameters[3],
                     "release_year": self.parameters[4],
-                    "stream_url": self.parameters[5],
+                    # A6: poster/backdrop sit between release_year and stream_url.
+                    "poster": self.parameters[5],
+                    "backdrop": self.parameters[6],
+                    "stream_url": self.parameters[7],
                     "is_active": True
                 }
                 self._movies_by_id[new_id] = slug
@@ -256,7 +259,7 @@ class RealisticRecordingConnection:
                 self._last_insert_id = new_id
                 self._rowcount = 1
                 return self
-            
+
             if "tavuno_series" in self.query:
                 new_id = self._next_ids["series"]
                 slug = self.parameters[1]
@@ -266,6 +269,10 @@ class RealisticRecordingConnection:
                     "slug": slug,
                     "category": self.parameters[2],
                     "synopsis": self.parameters[3],
+                    # A6: poster/backdrop/release_year added to the column list.
+                    "poster": self.parameters[4],
+                    "backdrop": self.parameters[5],
+                    "release_year": self.parameters[6],
                     "is_active": True
                 }
                 self._series_by_id[new_id] = slug
@@ -298,7 +305,9 @@ class RealisticRecordingConnection:
                     "episode_number": episode_number,
                     "title": self.parameters[2],
                     "synopsis": synopsis,
-                    "stream_url": self.parameters[4],
+                    # A6: thumbnail sits between synopsis and stream_url.
+                    "thumbnail": self.parameters[4],
+                    "stream_url": self.parameters[5],
                     "is_active": True
                 }
                 self._next_ids["episode"] += 1
@@ -309,7 +318,9 @@ class RealisticRecordingConnection:
         # Handle UPDATE statements
         if "UPDATE tavuno_movies" in self.query:
             # Two patterns:
-            # 1. UPDATE for upsert: parameters: (title, category_id, synopsis, year, stream_url, id)
+            # 1. UPDATE for upsert. A6 added poster/backdrop to the SET list, so the
+            #    id moved from index 5 to 7:
+            #    (title, category_id, synopsis, year, stream_url, poster, backdrop, id)
             # 2. UPDATE for deactivation: parameters: (id1, id2, id3, id4) - no field values
             if "is_active = FALSE" in self.query:
                 # Deactivation UPDATE - skip for test purposes
@@ -317,7 +328,7 @@ class RealisticRecordingConnection:
                 return self
             else:
                 # Upsert UPDATE
-                movie_id = self.parameters[5]
+                movie_id = self.parameters[7]
                 if movie_id in self._movies_by_id:
                     slug = self._movies_by_id[movie_id]
                     self._movies[slug]["title"] = self.parameters[0]
@@ -325,19 +336,25 @@ class RealisticRecordingConnection:
                     self._movies[slug]["synopsis"] = self.parameters[2]
                     self._movies[slug]["release_year"] = self.parameters[3]
                     self._movies[slug]["stream_url"] = self.parameters[4]
+                    self._movies[slug]["poster"] = self.parameters[5]
+                    self._movies[slug]["backdrop"] = self.parameters[6]
                 self._rowcount = 0
                 return self
-        
+
         if "UPDATE tavuno_series" in self.query:
             if "is_active = FALSE" in self.query:
                 self._rowcount = 0
                 return self
-            series_id = self.parameters[3]
+            # A6 added poster/backdrop/release_year: id moved from 3 to 6.
+            series_id = self.parameters[6]
             if series_id in self._series_by_id:
                 slug = self._series_by_id[series_id]
                 self._series[slug]["title"] = self.parameters[0]
                 self._series[slug]["category"] = self.parameters[1]
                 self._series[slug]["synopsis"] = self.parameters[2]
+                self._series[slug]["poster"] = self.parameters[3]
+                self._series[slug]["backdrop"] = self.parameters[4]
+                self._series[slug]["release_year"] = self.parameters[5]
             self._rowcount = 0
             return self
         
@@ -345,13 +362,15 @@ class RealisticRecordingConnection:
             if "is_active = FALSE" in self.query:
                 self._rowcount = 0
                 return self
-            episode_id = self.parameters[3]
+            # A6 added thumbnail: id moved from 3 to 4.
+            episode_id = self.parameters[4]
             # Find episode by id
             for key, ep in self._episodes.items():
                 if ep["id"] == episode_id:
                     self._episodes[key]["title"] = self.parameters[0]
                     self._episodes[key]["synopsis"] = self.parameters[1]
                     self._episodes[key]["stream_url"] = self.parameters[2]
+                    self._episodes[key]["thumbnail"] = self.parameters[3]
                     break
             self._rowcount = 0
             return self
@@ -409,13 +428,15 @@ class RealisticRecordingConnection:
         
         # Handle UPDATE statements' WHERE clause lookups
         if "UPDATE tavuno_movies" in self.query and "WHERE id" in self.query:
-            movie_id = self.parameters[5]
+            # A6: poster/backdrop added to the SET list, so the id is index 7 now.
+            movie_id = self.parameters[7]
             if movie_id in self._movies_by_id:
                 return {"id": movie_id}
             return None
-        
+
         if "UPDATE tavuno_series" in self.query and "WHERE id" in self.query:
-            series_id = self.parameters[3]
+            # A6: poster/backdrop/release_year added, so the id is index 6 now.
+            series_id = self.parameters[6]
             if series_id in self._series_by_id:
                 return {"id": series_id}
             return None

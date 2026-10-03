@@ -89,7 +89,11 @@
                             <DVR>
                                 <Enable>true</Enable>
                                 <TempStoragePath>/opt/ovenmediaengine/dvr</TempStoragePath>
-                                <MaxDuration>${OME_DVR_MAX_DURATION_SECONDS:-3600}</MaxDuration>
+                                <!-- OME env macro syntax is ${env:KEY:default} (regex in src/config/engine/
+                                         data_source.cpp matches only ${env:...}); a shell-style
+                                         ${KEY:-default} is left literal and parses as 0, which
+                                         makes the DVR trim loop delete every segment instantly. -->
+                                <MaxDuration>${env:OME_DVR_MAX_DURATION_SECONDS:3600}</MaxDuration>
                             </DVR>
                         </LLHLS>
                         <WebRTC />

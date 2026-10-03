@@ -8,6 +8,7 @@ the feature), and each read asks for the right customization kind.
 
 from contextlib import contextmanager
 from unittest.mock import MagicMock, Mock, patch
+import re
 
 import pytest
 
@@ -29,11 +30,40 @@ def service() -> CatalogService:
 
 @contextmanager
 def fake_db(service: CatalogService):
+    """A connection whose rows depend on *which table* was asked for.
+
+    A6 widened ``get_home`` from two tables to four (categories, channels,
+    movies, series), and this double used to answer every ``fetchall()`` with
+    whatever rows the test had staged. That let the home read pass while handing
+    channel-shaped rows to the movie mapper — the class of bug a double should
+    catch rather than hide — so dispatch is keyed on the table name now, and an
+    unrecognised query returns nothing.
+    """
     connection = MagicMock()
-    connection.execute.return_value.fetchall.return_value = []
+    rows: dict = {}
+    connection.rows = rows
+
+    def _fetchall():
+        query = ""
+        if connection.execute.call_args:
+            query = str(connection.execute.call_args[0][0])
+        # Match the FROM target, not a substring: the home VOD rails join
+        # tavuno_categories, so a plain `in query` test would hand category rows
+        # to the movie mapper.
+        match = re.search(r"FROM\s+([a-z_]+)", query, re.IGNORECASE)
+        if match is None:
+            return []
+        return rows.get(match.group(1), [])
+
+    connection.execute.return_value.fetchall.side_effect = _fetchall
     with patch.object(service, "_db") as mock_db:
         mock_db.return_value.__enter__.return_value = connection
         yield connection
+
+
+def stage(conn, table: str, rows: list) -> None:
+    """Route ``rows`` to any query naming ``table`` on this fake connection."""
+    conn.rows[table] = rows
 
 
 @contextmanager
@@ -89,7 +119,7 @@ class TestOverrideLookup:
 class TestChannelsRead:
     def test_hidden_channels_are_dropped(self, service):
         with fake_db(service) as conn:
-            conn.execute.return_value.fetchall.return_value = channel_rows(1, 2, 3)
+            stage(conn, "tavuno_channels", channel_rows(1, 2, 3))
             with stubbed_overrides(Overrides(hidden={2})):
                 channels = service.get_channels(profile_id=7)
 
@@ -97,7 +127,7 @@ class TestChannelsRead:
 
     def test_pinned_channels_float_to_the_front(self, service):
         with fake_db(service) as conn:
-            conn.execute.return_value.fetchall.return_value = channel_rows(1, 2, 3)
+            stage(conn, "tavuno_channels", channel_rows(1, 2, 3))
             with stubbed_overrides(Overrides(order={3: 0})):
                 channels = service.get_channels(profile_id=7)
 
@@ -105,7 +135,7 @@ class TestChannelsRead:
 
     def test_without_a_profile_the_natural_order_survives(self, service):
         with fake_db(service) as conn:
-            conn.execute.return_value.fetchall.return_value = channel_rows(1, 2, 3)
+            stage(conn, "tavuno_channels", channel_rows(1, 2, 3))
             with stubbed_overrides(Overrides(order={3: 0}, hidden={1})):
                 channels = service.get_channels()
 
@@ -119,7 +149,7 @@ class TestCategoriesRead:
     )
     def test_each_catalog_kind_asks_for_its_own_customization_kind(self, service, kind, expected):
         with fake_db(service) as conn:
-            conn.execute.return_value.fetchall.return_value = channel_rows(1, 2)
+            stage(conn, "tavuno_categories", channel_rows(1, 2))
             with stubbed_overrides(Overrides()) as cls:
                 service.get_categories(kind=kind, profile_id=7)
 
@@ -127,7 +157,7 @@ class TestCategoriesRead:
 
     def test_an_unscoped_category_read_applies_nothing(self, service):
         with fake_db(service) as conn:
-            conn.execute.return_value.fetchall.return_value = channel_rows(1, 2)
+            stage(conn, "tavuno_categories", channel_rows(1, 2))
             with stubbed_overrides(Overrides(hidden={1})) as cls:
                 categories = service.get_categories(profile_id=7)
 
@@ -136,7 +166,7 @@ class TestCategoriesRead:
 
     def test_hidden_categories_are_dropped(self, service):
         with fake_db(service) as conn:
-            conn.execute.return_value.fetchall.return_value = channel_rows(1, 2)
+            stage(conn, "tavuno_categories", channel_rows(1, 2))
             with stubbed_overrides(Overrides(hidden={1})):
                 categories = service.get_categories(kind="live", profile_id=7)
 
@@ -146,7 +176,8 @@ class TestCategoriesRead:
 class TestHomeRead:
     def test_featured_channels_carry_the_profile_order(self, service):
         with fake_db(service) as conn:
-            conn.execute.return_value.fetchall.return_value = channel_rows(1, 2, 3)
+            stage(conn, "tavuno_categories", channel_rows(1, 2, 3))
+            stage(conn, "tavuno_channels", channel_rows(1, 2, 3))
             with stubbed_overrides(Overrides(order={2: 0}, hidden={3})):
                 home = service.get_home(profile_id=7)
 
@@ -154,7 +185,8 @@ class TestHomeRead:
 
     def test_home_without_a_profile_ignores_the_overrides(self, service):
         with fake_db(service) as conn:
-            conn.execute.return_value.fetchall.return_value = channel_rows(1, 2, 3)
+            stage(conn, "tavuno_categories", channel_rows(1, 2, 3))
+            stage(conn, "tavuno_channels", channel_rows(1, 2, 3))
             with stubbed_overrides(Overrides(order={2: 0}, hidden={3})) as cls:
                 home = service.get_home()
 

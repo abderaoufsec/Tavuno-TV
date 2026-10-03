@@ -19,6 +19,10 @@ from .auth.deps import current_principal, require_admin
 from .catalog.service import CatalogService
 from .customize.models import CustomizationPayload
 from .customize.service import CustomizeService
+from .favourites.models import FavouriteList, FavouriteToggle
+from .favourites.service import FavouritesService
+from .resume.models import ProgressList, ProgressUpdate
+from .resume.service import ResumeService
 from .epg.service import EpgService, parse_timestamp
 from .profiles.models import CreateProfileRequest, UpdateProfileRequest
 from .profiles.service import ProfilesService
@@ -607,6 +611,245 @@ def delete_customizations(kind: str, services: ServicesDependency, principal: di
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"kind": kind, "removed": removed}
+
+
+# --- Favourites (A6) --------------------------------------------------------
+#
+# A favourite is a per-profile *flag* on one catalog item, deliberately kept
+# separate from `/v1/customize` (which owns rail order and visibility): "pinned
+# to the top" and "I love this" are different intents, and conflating them makes
+# un-pinning unable to express "still a favourite, just not first".
+#
+# Every route requires a profile for the same reason the customize routes do —
+# there is no such thing as a favourite without an owner.
+
+
+def _favorite_row_to_item(catalog: CatalogService, kind: str, row: dict[str, Any]) -> dict[str, Any] | None:
+    """Turn a raw ``tavuno_*`` row into the public shape of that kind.
+
+    Goes through the catalog's own mappers so a favourite rail shows exactly
+    what the grid it was favourited from shows — same fields, same artwork
+    normalization — rather than a second, drifting serialization.
+    """
+    try:
+        if kind == "channel":
+            item = catalog._map_channel(row)
+        elif kind == "movie":
+            item = catalog._map_movie(row)
+        elif kind == "series":
+            item = catalog._map_series(row)
+        else:
+            return None
+    except Exception:
+        logger.warning("Could not map favourite row for kind=%s", kind)
+        return None
+    return item.model_dump()
+
+
+@app.get("/v1/favourites/{kind}", tags=["favourites"])
+def list_favourites(
+    kind: str,
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+    limit: int = 50,
+) -> dict[str, Any]:
+    """The caller's favourites for one kind, newest first."""
+    profile_id = require_profile_id(principal)
+    try:
+        rows = FavouritesService(services).list_rows(profile_id, kind, limit=max(1, min(limit, 200)))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    catalog = CatalogService(services)
+    items = [
+        mapped
+        for mapped in (_favorite_row_to_item(catalog, kind, row) for row in rows)
+        if mapped is not None
+    ]
+    return FavouriteList(kind=kind, items=items).model_dump()
+
+
+@app.post("/v1/favourites", tags=["favourites"])
+def set_favourite(
+    payload: FavouriteToggle,
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+) -> dict[str, Any]:
+    """Set the favourite flag for one item.
+
+    Omitting ``is_favourite`` flips the current value, which is what a heart
+    button wants: the client does not have to read the row to know what pressing
+    it means. Supplying it makes the call idempotent, which is what a "retry"
+    wants.
+    """
+    profile_id = require_profile_id(principal)
+    service = FavouritesService(services)
+    try:
+        value = (
+            payload.is_favourite
+            if payload.is_favourite is not None
+            else service.toggle(profile_id, payload.kind, payload.item_id)
+        )
+        service.set(profile_id, payload.kind, payload.item_id, bool(value))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "kind": payload.kind,
+        "item_id": payload.item_id,
+        "is_favourite": bool(value),
+        "item": _favorite_item(services, payload.kind, payload.item_id) if value else None,
+    }
+
+
+def _favorite_item(services: Services, kind: str, item_id: int) -> dict[str, Any] | None:
+    """Resolve one item through the public catalog reads, or ``None``.
+
+    Goes via the catalog service (not a private query) so the item echoed back
+    on a toggle is byte-identical to what the grid would have rendered for it.
+    """
+    catalog = CatalogService(services)
+    try:
+        if kind == "channel":
+            item = catalog.get_channel(item_id)
+        elif kind == "movie":
+            item = catalog.get_movie(item_id)
+        elif kind == "series":
+            item = catalog.get_series_by_id(item_id)
+        else:
+            return None
+    except Exception:
+        logger.warning("Could not resolve favourite item kind=%s id=%s", kind, item_id)
+        return None
+    return item.model_dump() if item is not None else None
+
+
+@app.delete("/v1/favourites/{kind}/{item_id}", tags=["favourites"])
+def delete_favourite(
+    kind: str,
+    item_id: int,
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+) -> dict[str, Any]:
+    """Drop one favourite.
+
+    Idempotent rather than 404 on a missing row: un-favouriting something that
+    was never favourited already satisfies the caller.
+    """
+    profile_id = require_profile_id(principal)
+    try:
+        FavouritesService(services).set(profile_id, kind, item_id, False)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"kind": kind, "item_id": item_id, "is_favourite": False}
+
+
+# --- Resume / progress (A6) -------------------------------------------------
+#
+# Durable "where was I" per profile. Deliberately separate from
+# `/v1/playback/*`, which mints an authorization lease that the session reaper
+# deletes — progress recorded there would evaporate minutes later.
+
+
+@app.get("/v1/resume", tags=["resume"])
+def list_resume(
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Continue-watching entries for the caller, most recently watched first."""
+    profile_id = require_profile_id(principal)
+    rows = ResumeService(services).recent(profile_id, limit=max(1, min(limit, 50)))
+    catalog = CatalogService(services)
+    items = [
+        mapped
+        for mapped in (_resume_row_to_item(catalog, row) for row in rows)
+        if mapped is not None
+    ]
+    return ProgressList(items=items).model_dump()
+
+
+def _resume_row_to_item(catalog: CatalogService, row: dict[str, Any]) -> dict[str, Any] | None:
+    """Publicize one resume row (a ``kind`` tag plus a raw catalog row).
+
+    :meth:`ResumeService.recent` returns raw ``SELECT *`` rows; this maps them
+    through the catalog's own mappers so the rail renders identically to a grid,
+    while adding the three resume-specific keys (``kind``, ``progress``,
+    ``position_ms``) the client needs to draw a bar and pick the item back up.
+    """
+    kind = str(row.get("kind") or "")
+    try:
+        if kind == "channel":
+            item = catalog._map_channel(row)
+        elif kind == "movie":
+            item = catalog._map_movie(row)
+        elif kind == "series":
+            item = catalog._map_series(row)
+        else:
+            return None
+    except Exception:
+        logger.warning("Could not map resume row for kind=%s", kind)
+        return None
+
+    mapped = item.model_dump()
+    mapped.pop("viewer", None)
+    mapped.update(
+        {
+            "kind": kind,
+            "progress": row.get("progress"),
+            "position_ms": row.get("position_ms"),
+            "duration_ms": row.get("duration_ms"),
+        }
+    )
+    return mapped
+
+
+@app.get("/v1/resume/{kind}/{item_id}", tags=["resume"])
+def get_resume(
+    kind: str,
+    item_id: int,
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+) -> dict[str, Any]:
+    """Progress for one item; 404 when there is nothing to resume."""
+    profile_id = require_profile_id(principal)
+    try:
+        payload = ResumeService(services).get(profile_id, kind, item_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if payload is None:
+        raise HTTPException(status_code=404, detail="No resume position for that item")
+    return payload.model_dump()
+
+
+@app.put("/v1/resume", tags=["resume"])
+def put_resume(
+    payload: ProgressUpdate,
+    services: ServicesDependency,
+    principal: dict = Depends(current_principal),
+) -> Any:
+    """Report a playback position.
+
+    Answers **204** when the write cleared the row instead of storing one —
+    finished, or rewound to the start. That is a success, not a failure: the
+    client's correct next action is to stop drawing a progress bar, and a 200
+    with an empty body would leave it guessing whether the write happened.
+    """
+    profile_id = require_profile_id(principal)
+    try:
+        stored = ResumeService(services).record(
+            profile_id,
+            payload.kind,
+            payload.item_id,
+            payload.position_ms,
+            payload.duration_ms,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if stored is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return stored.model_dump()
 
 
 # --- Profiles (Slice D) ------------------------------------------------------

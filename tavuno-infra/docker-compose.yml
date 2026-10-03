@@ -422,6 +422,10 @@ services:
       DISPATCHARR_EXPECTED_VERSION: ${DISPATCHARR_EXPECTED_VERSION:-0.28.0}
       DISPATCHARR_SYNC_INTERVAL_SECONDS: ${DISPATCHARR_SYNC_INTERVAL_SECONDS:-3600}
       DISPATCHARR_TIMEOUT_SECONDS: ${DISPATCHARR_TIMEOUT_SECONDS:-20}
+      # Public Directus origin, used to turn stored file UUIDs into fetchable
+      # /assets/<uuid> URLs (A6). This is the address *clients* can reach, so it
+      # is the emulator's host alias locally and the real origin in production.
+      DIRECTUS_PUBLIC_URL: ${DIRECTUS_PUBLIC_URL:-}
       OME_API_URL: http://tavuno-ovenmediaengine:8081
       OME_API_TOKEN: ${OME_API_TOKEN:-tavuno-m1-local}
       OME_PLAYBACK_BASE_URL: ${OME_PLAYBACK_BASE_URL:-http://localhost:8080/media}

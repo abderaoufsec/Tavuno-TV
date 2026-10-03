@@ -12,17 +12,24 @@ The service:
 - Does not integrate with Dispatcharr (future milestone)
 """
 
-from typing import Optional, List, Dict, Any
+import logging
+from typing import Optional, List, Dict, Any, Set
 from contextlib import contextmanager
 
 from .models import (
     Channel, Category, Movie, Series,
-    ChannelDetails, MovieDetails, SeriesDetails, SeasonDetails,
-    Competition, Team, Match, MatchDetails
+    ChannelDetails, MovieDetails, SeriesDetails, SeasonDetails, EpisodeDetails,
+    Competition, Team, Match, MatchDetails, ViewerState
 )
 from .scope import live_channel_limit, live_channel_scope, scope_int, scope_text
+from ..assets import asset_url
+from ..content_refs import fetch_items
 from ..customize.ordering import apply_overrides
 from ..customize.service import CustomizeService
+from ..favourites.service import FavouritesService
+from ..resume.service import ResumeService
+
+logger = logging.getLogger("tavuno-control.catalog")
 
 # Which customization kind applies to a category read, keyed by the catalog
 # "kind" the endpoint was asked for. A read with no kind (every category) has no
@@ -79,14 +86,79 @@ class CatalogService:
         A no-op when no profile is supplied, so an unauthenticated/legacy caller
         sees exactly the pre-customization behaviour. Applying happens in Python
         rather than SQL because the catalog is small (the whole channel list is
-        already fetched) and because the ordering rule — pinned first, then the
-        natural order — is a pure function worth testing
+        already fetched) and because the ordering rule â€” pinned first, then the
+        natural order â€” is a pure function worth testing
         (:func:`app.customize.ordering.apply_overrides`).
         """
         if profile_id is None:
             return items
         overrides = CustomizeService(self.services).overrides(int(profile_id), kind)
         return apply_overrides(items, overrides)
+
+    # --- Viewer state + assets (A6) ------------------------------------------
+
+    def _viewer_state(
+        self,
+        profile_id: Optional[int],
+        kind: str,
+        ids: List[int],
+    ) -> Dict[int, ViewerState]:
+        """Favourite flag + resume position for the given ids, keyed by id.
+
+        One pair of queries per read, not per item: a 12-tile rail asking the
+        database twice is cheap, asking 24 times is not. A profile-less caller
+        gets no state at all â€” and, importantly, gets *no queries either*, so the
+        pre-A6 call pattern is unchanged for anyone who has not logged in.
+
+        A failure here degrades rather than raises: a grid that cannot be read
+        because the favourites table is missing is strictly worse than a grid
+        with no hearts on it. Degraded still returns a state per id (all
+        defaults), so ``viewer`` is present for every profile read and a client
+        never has to null-check it.
+        """
+        if profile_id is None:
+            return {}
+        if not ids:
+            return {}
+
+        favourites: set = set()
+        progress: Dict[int, Any] = {}
+        try:
+            favourites = FavouritesService(self.services).marked(int(profile_id), kind, ids)
+            progress = ResumeService(self.services).by_kind(int(profile_id), kind, ids)
+        except Exception:  # pragma: no cover - needs a database without migration 009
+            logger.warning(
+                "Viewer state unavailable for kind=%s; serving catalog without it", kind
+            )
+
+        return {
+            item_id: ViewerState(
+                is_favourite=item_id in favourites,
+                progress=progress[item_id].progress if item_id in progress else None,
+                position_ms=progress[item_id].position_ms if item_id in progress else 0,
+            )
+            for item_id in ids
+        }
+
+    def _with_viewer_state(
+        self,
+        items: List[Any],
+        profile_id: Optional[int],
+        kind: str,
+    ) -> List[Any]:
+        """Attach per-item [ViewerState] in place, and return the same list."""
+        states = self._viewer_state(profile_id, kind, [item.id for item in items])
+        if not states:
+            return items
+        for item in items:
+            state = states.get(item.id)
+            if state is not None:
+                item.viewer = state
+        return items
+
+    def _asset(self, value: Any) -> Optional[str]:
+        """Normalize one stored artwork reference into a fetchable URL."""
+        return asset_url(value, getattr(self.services.settings, "directus_url", ""))
 
     def _map_channel(self, row: dict) -> Channel:
         """Map database row to Channel model.
@@ -99,7 +171,7 @@ class CatalogService:
             name=row["name"],
             slug=row["slug"],
             category_id=row.get("category"),  # Map 'category' to 'category_id'
-            logo=str(row["logo"]) if row.get("logo") else None,  # UUID to string
+            logo=self._asset(row.get("logo")),  # Directus UUID -> asset URL
             is_active=row["is_active"],
         )
 
@@ -132,6 +204,7 @@ class CatalogService:
             synopsis=row.get("synopsis"),
             release_year=row.get("release_year"),
             is_active=row["is_active"],
+            poster=self._asset(row.get("poster")),
         )
 
     def _map_series(self, row: dict) -> Series:
@@ -147,6 +220,7 @@ class CatalogService:
             category_id=row.get("category"),  # Map 'category' to 'category_id'
             synopsis=row.get("synopsis"),
             is_active=row["is_active"],
+            poster=self._asset(row.get("poster")),
         )
 
     # M11 Sports mappers
@@ -257,7 +331,7 @@ class CatalogService:
         with self._db() as conn:
             rows = conn.execute(query, tuple(parameters)).fetchall()
 
-        channels = [self._map_channel(row) for row in rows]
+        channels = self._with_viewer_state([self._map_channel(row) for row in rows], profile_id, "channel")
         return self._apply_profile_overrides(channels, profile_id, "live_channel")
 
     def get_channel(self, channel_id: int) -> Optional[Channel]:
@@ -328,16 +402,17 @@ class CatalogService:
         
         return self._map_category(row)
 
-    def get_movies(self, category_id: Optional[int] = None) -> List[Movie]:
+    def get_movies(self, category_id: Optional[int] = None, profile_id: Optional[int] = None) -> List[Movie]:
         """Get all active movies, optionally filtered by category.
-        
+
         Args:
             category_id: Optional category ID to filter movies
-            
+            profile_id: Optional profile whose favourite/progress state to project
+
         Returns:
             List of Movie models
         """
-        query = "SELECT id, title, slug, category, synopsis, release_year, is_active FROM tavuno_movies WHERE is_active = TRUE"
+        query = "SELECT id, title, slug, category, synopsis, release_year, poster, is_active FROM tavuno_movies WHERE is_active = TRUE"
         parameters: tuple = ()
         
         if category_id is not None:
@@ -349,7 +424,7 @@ class CatalogService:
         with self._db() as conn:
             rows = conn.execute(query, parameters).fetchall()
         
-        return [self._map_movie(row) for row in rows]
+        return self._with_viewer_state([self._map_movie(row) for row in rows], profile_id, "movie")
 
     def get_movie(self, movie_id: int) -> Optional[Movie]:
         """Get a single movie by ID.
@@ -362,7 +437,7 @@ class CatalogService:
         """
         with self._db() as conn:
             row = conn.execute(
-                "SELECT id, title, slug, category, synopsis, release_year, is_active FROM tavuno_movies WHERE id = %s AND is_active = TRUE",
+                "SELECT id, title, slug, category, synopsis, release_year, poster, is_active FROM tavuno_movies WHERE id = %s AND is_active = TRUE",
                 (movie_id,),
             ).fetchone()
         
@@ -371,16 +446,17 @@ class CatalogService:
         
         return self._map_movie(row)
 
-    def get_series(self, category_id: Optional[int] = None) -> List[Series]:
+    def get_series(self, category_id: Optional[int] = None, profile_id: Optional[int] = None) -> List[Series]:
         """Get all active series, optionally filtered by category.
-        
+
         Args:
             category_id: Optional category ID to filter series
-            
+            profile_id: Optional profile whose favourite/progress state to project
+
         Returns:
             List of Series models
         """
-        query = "SELECT id, title, slug, category, synopsis, is_active FROM tavuno_series WHERE is_active = TRUE"
+        query = "SELECT id, title, slug, category, synopsis, poster, is_active FROM tavuno_series WHERE is_active = TRUE"
         parameters: tuple = ()
         
         if category_id is not None:
@@ -392,7 +468,7 @@ class CatalogService:
         with self._db() as conn:
             rows = conn.execute(query, parameters).fetchall()
         
-        return [self._map_series(row) for row in rows]
+        return self._with_viewer_state([self._map_series(row) for row in rows], profile_id, "series")
 
     def get_series_by_id(self, series_id: int) -> Optional[Series]:
         """Get a single series by ID.
@@ -405,7 +481,7 @@ class CatalogService:
         """
         with self._db() as conn:
             row = conn.execute(
-                "SELECT id, title, slug, category, synopsis, is_active FROM tavuno_series WHERE id = %s AND is_active = TRUE",
+                "SELECT id, title, slug, category, synopsis, poster, is_active FROM tavuno_series WHERE id = %s AND is_active = TRUE",
                 (series_id,),
             ).fetchone()
         
@@ -421,7 +497,12 @@ class CatalogService:
         """Escape LIKE/ILIKE wildcards: a query of '%' must not match everything."""
         return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
-    def search(self, query: str, limit: int = 20) -> Dict[str, Any]:
+    def search(
+            self,
+            query: str,
+            limit: int = 20,
+            profile_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Case-insensitive name/title search across channels, movies and series.
 
         Live channels are filtered through the same test-scope allowlist (and cap)
@@ -431,6 +512,7 @@ class CatalogService:
         Args:
             query: Raw user query; trimmed before use. Empty -> empty result groups.
             limit: Per-collection cap, clamped to 1..50.
+            profile_id: Optional profile whose favourite/progress state to project
 
         Returns:
             ``{"query": str, "channels": [Channel], "movies": [Movie], "series": [Series]}``
@@ -453,11 +535,11 @@ class CatalogService:
         )
         channel_params: List[Any] = [pattern, *scope_params, channel_cap]
         movie_query = (
-            "SELECT id, title, slug, category, synopsis, release_year, is_active FROM tavuno_movies "
+            "SELECT id, title, slug, category, synopsis, release_year, poster, is_active FROM tavuno_movies "
             "WHERE is_active = TRUE AND title ILIKE %s ORDER BY title LIMIT %s"
         )
         series_query = (
-            "SELECT id, title, slug, category, synopsis, is_active FROM tavuno_series "
+            "SELECT id, title, slug, category, synopsis, poster, is_active FROM tavuno_series "
             "WHERE is_active = TRUE AND title ILIKE %s ORDER BY title LIMIT %s"
         )
 
@@ -468,19 +550,42 @@ class CatalogService:
 
         return {
             "query": term,
-            "channels": [self._map_channel(row) for row in channel_rows],
-            "movies": [self._map_movie(row) for row in movie_rows],
-            "series": [self._map_series(row) for row in series_rows],
+            "channels": self._with_viewer_state(
+                [self._map_channel(row) for row in channel_rows], profile_id, "channel"
+            ),
+            "movies": self._with_viewer_state(
+                [self._map_movie(row) for row in movie_rows], profile_id, "movie"
+            ),
+            "series": self._with_viewer_state(
+                [self._map_series(row) for row in series_rows], profile_id, "series"
+            ),
         }
 
+    # Rail sizes. Small on purpose: these are TV rails a viewer scrolls with a
+    # remote, and a 40-tile row is unreachable content rather than content.
+    HOME_CHANNEL_RAIL = 12
+    HOME_VOD_RAIL = 12
+    HOME_PERSONAL_RAIL = 12
+
     def get_home(self, profile_id: Optional[int] = None) -> dict:
-        """Get home page data (categories and featured channels).
+        """Every home rail in one round trip.
+
+        The response is **additive** on purpose. It used to carry only
+        ``categories`` and ``featured_channels``, but the Android client has
+        always modeled ``channels``/``categories``/``movies``/``series`` â€” so the
+        two halves of the app disagreed about the shape of home and Gson's nulls
+        were invisible until a screen tried to render them. Both keys are now
+        returned (``featured_channels`` stays as an alias of ``channels``)
+        because removing it would break any caller outside this repo, while
+        adding to it breaks nobody: Gson ignores absent keys, so a build from
+        before A6 reads the new payload correctly.
 
         Args:
-            profile_id: Optional profile whose channel rail order/visibility to apply
+            profile_id: Optional profile whose rails/order/visibility to apply
 
         Returns:
-            Dictionary with 'categories' and 'featured_channels' keys
+            Dictionary with 'categories', 'channels', 'featured_channels',
+            'movies', 'series', 'continue_watching' and 'favourites'.
         """
         with self._db() as conn:
             categories = conn.execute(
@@ -489,20 +594,136 @@ class CatalogService:
             scope_clause, scope_params = self._live_channel_scope()
             # The limit doubles as the rail size: a 10-channel test scope must
             # not advertise 12 features.
-            channel_limit = self._live_channel_limit() or 12
+            channel_limit = self._live_channel_limit() or self.HOME_CHANNEL_RAIL
             channels = conn.execute(
                 "SELECT id, name, slug, category, logo, is_active FROM tavuno_channels WHERE is_active = TRUE"
                 + scope_clause
                 + " ORDER BY name LIMIT %s",
                 tuple(scope_params) + (channel_limit,),
             ).fetchall()
-        
+
+        channel_items = self._apply_profile_overrides(
+            self._with_viewer_state(
+                [self._map_channel(row) for row in channels], profile_id, "channel"
+            ),
+            profile_id,
+            "live_channel",
+        )
+        personal = self._home_personal(profile_id)
+
         return {
             "categories": [self._map_category(row) for row in categories],
-            "featured_channels": self._apply_profile_overrides(
-                [self._map_channel(row) for row in channels], profile_id, "live_channel"
+            "channels": channel_items,
+            # Kept for compatibility with callers written before `channels`; the
+            # two are the same list, not two queries.
+            "featured_channels": channel_items,
+            "movies": self._with_viewer_state(
+                self._home_vod("tavuno_movies", "_map_movie", self.HOME_VOD_RAIL),
+                profile_id,
+                "movie",
             ),
+            "series": self._with_viewer_state(
+                self._home_vod("tavuno_series", "_map_series", self.HOME_VOD_RAIL),
+                profile_id,
+                "series",
+            ),
+            "continue_watching": personal["continue_watching"],
+            "favourites": personal["favourites"],
         }
+
+    def _home_vod(self, table: str, mapper: str, limit: int) -> List[Any]:
+        """One VOD rail (movies or series), most recently added first.
+
+        A LEFT JOIN on the category is what makes this usable as a rail: the
+        tiles carry their category name, so the client does not need a second
+        request to label a grid. Failures degrade to an empty rail â€” a missing
+        VOD table must not take the home screen down with it.
+        """
+        try:
+            with self._db() as conn:
+                rows = conn.execute(
+                    f"SELECT v.*, c.name AS category_name FROM {table} v"
+                    " LEFT JOIN tavuno_categories c ON v.category = c.id"
+                    " WHERE v.is_active = TRUE"
+                    " ORDER BY v.created_at DESC NULLS LAST, v.title"
+                    " LIMIT %s",
+                    (limit,),
+                ).fetchall()
+        except Exception:
+            logger.warning("Home rail %s unavailable; serving it empty", table)
+            return []
+        return [getattr(self, mapper)(row) for row in rows]
+
+    def _home_personal(self, profile_id: Optional[int]) -> Dict[str, List[Dict[str, Any]]]:
+        """The two per-profile rails: continue watching, then favourites.
+
+        Both are computed only for a real profile, so an anonymous caller pays
+        no queries and sees the same payload it always did. Each rail is
+        independent: a missing resume row must not hide the favourites.
+        """
+        if profile_id is None:
+            return {"continue_watching": [], "favourites": []}
+
+        rails: Dict[str, List[Dict[str, Any]]] = {}
+        try:
+            rails["continue_watching"] = self._continue_watching(int(profile_id))
+        except Exception:
+            logger.warning("Continue-watching rail unavailable; serving it empty")
+            rails["continue_watching"] = []
+
+        try:
+            favourites: List[Dict[str, Any]] = []
+            for kind in ("movie", "series", "channel"):
+                for row in FavouritesService(self.services).list_rows(
+                    int(profile_id), kind, limit=self.HOME_PERSONAL_RAIL
+                ):
+                    favourites.append({**row, "kind": kind})
+            rails["favourites"] = favourites[: self.HOME_PERSONAL_RAIL]
+        except Exception:
+            logger.warning("Favourites rail unavailable; serving it empty")
+            rails["favourites"] = []
+
+        return rails
+
+    def _continue_watching(self, profile_id: int) -> List[Dict[str, Any]]:
+        """Resumable rows, most recent first, each carrying kind + progress.
+
+        Read once rather than through :meth:`ResumeService.recent` so the rows and
+        their progress share a single ordered query â€” zipping two independently
+        ordered reads would silently pair the wrong items.
+        """
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT kind, item_id, position_ms, duration_ms FROM tavuno_resume"
+                " WHERE profile = %s ORDER BY updated_at DESC, id DESC LIMIT %s",
+                (profile_id, self.HOME_PERSONAL_RAIL),
+            ).fetchall()
+
+        results: List[Dict[str, Any]] = []
+        with self._db() as conn:
+            for row in rows:
+                kind = str(row["kind"])
+                try:
+                    fetched = fetch_items(conn, kind, [int(row["item_id"])])
+                except ValueError:
+                    # A row under a kind this build does not know must not take
+                    # the whole rail down.
+                    continue
+                item = fetched.get(int(row["item_id"]))
+                if item is None:
+                    continue
+                results.append(
+                    {
+                        **item,
+                        "kind": kind,
+                        "progress": ResumeService.ratio(
+                            int(row["position_ms"]), int(row["duration_ms"])
+                        ),
+                        "position_ms": int(row["position_ms"]),
+                        "duration_ms": int(row["duration_ms"]),
+                    }
+                )
+        return results
 
     def get_channel_details(self, channel_id: int) -> Optional[ChannelDetails]:
         """Get detailed channel information for content detail screens (M12).
@@ -532,18 +753,23 @@ class CatalogService:
             name=row["name"],
             slug=row["slug"],
             category_id=row.get("category"),
-            logo=str(row["logo"]) if row.get("logo") else None,
+            logo=self._asset(row.get("logo")),
             is_active=row["is_active"],
             description=None,  # No description field in current schema
             category_name=row.get("category_name"),
             playback_available=True,  # Assume available if active
         )
 
-    def get_movie_details(self, movie_id: int) -> Optional[MovieDetails]:
+    def get_movie_details(
+        self,
+        movie_id: int,
+        profile_id: Optional[int] = None,
+    ) -> Optional[MovieDetails]:
         """Get detailed movie information for content detail screens (M12).
 
         Args:
             movie_id: Movie ID
+            profile_id: Optional profile whose favourite/progress state to project
 
         Returns:
             MovieDetails model or None if not found
@@ -551,7 +777,9 @@ class CatalogService:
         with self._db() as conn:
             row = conn.execute(
                 """
-                SELECT m.id, m.title, m.slug, m.category, m.synopsis, m.release_year, m.is_active, cat.name as category_name
+                SELECT m.id, m.title, m.slug, m.category, m.synopsis, m.release_year,
+                       m.is_active, m.poster, m.backdrop, m.duration,
+                       cat.name as category_name
                 FROM tavuno_movies m
                 LEFT JOIN tavuno_categories cat ON m.category = cat.id
                 WHERE m.id = %s AND m.is_active = TRUE
@@ -562,7 +790,7 @@ class CatalogService:
         if row is None:
             return None
 
-        return MovieDetails(
+        details = MovieDetails(
             id=row["id"],
             title=row["title"],
             slug=row["slug"],
@@ -570,19 +798,26 @@ class CatalogService:
             synopsis=row.get("synopsis"),
             release_year=row.get("release_year"),
             is_active=row["is_active"],
-            poster=None,  # No poster field in current schema
-            backdrop=None,  # No backdrop field in current schema
-            duration=None,  # No duration field in current schema
+            # Artwork: a stored Directus file UUID becomes an /assets/<uuid> URL.
+            poster=self._asset(row.get("poster")),
+            backdrop=self._asset(row.get("backdrop")),
+            duration=row.get("duration"),
             category_name=row.get("category_name"),
             genres=None,  # No genres field in current schema
             playback_available=True,  # Assume available if active
         )
+        return self._with_viewer_state([details], profile_id, "movie")[0]
 
-    def get_series_details(self, series_id: int) -> Optional[SeriesDetails]:
+    def get_series_details(
+        self,
+        series_id: int,
+        profile_id: Optional[int] = None,
+    ) -> Optional[SeriesDetails]:
         """Get detailed series information for content detail screens (M12).
 
         Args:
             series_id: Series ID
+            profile_id: Optional profile whose favourite/progress state to project
 
         Returns:
             SeriesDetails model or None if not found
@@ -590,7 +825,9 @@ class CatalogService:
         with self._db() as conn:
             row = conn.execute(
                 """
-                SELECT s.id, s.title, s.slug, s.category, s.synopsis, s.is_active, cat.name as category_name
+                SELECT s.id, s.title, s.slug, s.category, s.synopsis, s.is_active,
+                       s.poster, s.backdrop, s.release_year,
+                       cat.name as category_name
                 FROM tavuno_series s
                 LEFT JOIN tavuno_categories cat ON s.category = cat.id
                 WHERE s.id = %s AND s.is_active = TRUE
@@ -634,28 +871,29 @@ class CatalogService:
                         id=season_row["id"],
                         season_number=season_row["season_number"],
                         name=season_row["title"],
-                        poster=str(season_row["poster"]) if season_row.get("poster") else None,
+                        poster=self._asset(season_row.get("poster")),
                         episode_count=season_episode_count
                     ))
         except Exception:
             # Tables might not exist yet
             pass
 
-        return SeriesDetails(
+        details = SeriesDetails(
             id=row["id"],
             title=row["title"],
             slug=row["slug"],
             category_id=row.get("category"),
             synopsis=row.get("synopsis"),
             is_active=row["is_active"],
-            poster=None,  # No poster field in current schema
-            backdrop=None,  # No backdrop field in current schema
-            release_year=None,  # No release_year field in current schema
+            poster=self._asset(row.get("poster")),
+            backdrop=self._asset(row.get("backdrop")),
+            release_year=row.get("release_year"),
             category_name=row.get("category_name"),
             seasons=seasons_data if seasons_data else None,
             episode_count=episode_count if episode_count > 0 else None,
             playback_available=True,  # Assume available if active
         )
+        return self._with_viewer_state([details], profile_id, "series")[0]
 
     def get_season_episodes(self, season_id: int) -> List[Dict[str, Any]]:
         """Get episodes for a specific season (M12).
@@ -685,7 +923,7 @@ class CatalogService:
                     "title": row["title"],
                     "synopsis": row.get("synopsis"),
                     "duration": row.get("duration"),
-                    "thumbnail": str(row["thumbnail"]) if row.get("thumbnail") else None,
+                    "thumbnail": self._asset(row.get("thumbnail")),
                 }
                 for row in rows
             ]

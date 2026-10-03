@@ -21,6 +21,20 @@ if TYPE_CHECKING:
     from typing import ForwardRef
 
 
+# Per-item viewer state added by A6. Kept on every catalog model (rather than in
+# a wrapper) because that is what the Android clients already deserialize: Gson
+# ignores absent keys, so a client built before this change still parses these
+# responses unchanged, and a client built after it can read the flag without a
+# second request. All three default to falsy/None, so any construction site that
+# predates A6 keeps working.
+class ViewerState(BaseModel):
+    """Favourite flag + resume position for one item, as projected by the catalog."""
+
+    is_favourite: bool = False
+    progress: Optional[float] = None
+    position_ms: int = 0
+
+
 class Channel(BaseModel):
     """Normalized Tavuno channel model.
 
@@ -30,8 +44,9 @@ class Channel(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     slug: str = Field(min_length=1, max_length=160)
     category_id: Optional[int] = None
-    logo: Optional[str] = None  # UUID as string for JSON serialization
+    logo: Optional[str] = None  # Directus file UUID, normalized to an asset URL on read
     is_active: bool = True
+    viewer: Optional[ViewerState] = None
 
 
 class Category(BaseModel):
@@ -59,6 +74,8 @@ class Movie(BaseModel):
     synopsis: Optional[str] = None
     release_year: Optional[int] = None
     is_active: bool = True
+    poster: Optional[str] = None
+    viewer: Optional[ViewerState] = None
 
 
 class Series(BaseModel):
@@ -72,6 +89,8 @@ class Series(BaseModel):
     category_id: Optional[int] = None
     synopsis: Optional[str] = None
     is_active: bool = True
+    poster: Optional[str] = None
+    viewer: Optional[ViewerState] = None
 
 
 class ChannelDetails(BaseModel):
@@ -110,6 +129,7 @@ class MovieDetails(BaseModel):
     category_name: Optional[str] = None
     genres: Optional[List[str]] = None
     playback_available: bool = True
+    viewer: Optional[ViewerState] = None
 
 
 class SeasonDetails(BaseModel):
@@ -143,6 +163,7 @@ class SeriesDetails(BaseModel):
     seasons: Optional[List[SeasonDetails]] = None
     episode_count: Optional[int] = None
     playback_available: bool = True
+    viewer: Optional[ViewerState] = None
 
 
 class EpisodeDetails(BaseModel):
@@ -158,6 +179,7 @@ class EpisodeDetails(BaseModel):
     duration: Optional[str] = None
     thumbnail: Optional[str] = None
     playback_available: bool = True
+    viewer: Optional[ViewerState] = None
 
 
 # M11 Sports Models

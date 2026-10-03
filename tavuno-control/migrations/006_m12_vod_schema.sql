@@ -93,6 +93,11 @@ ALTER TABLE tavuno_episodes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH T
 -- that predates them will still work at the app level — those features simply
 -- return None (handled by row.get() in the catalog service).  If a future feature
 -- needs them, add an ALTER TABLE below.
+--
+-- **Amended by 009_m14_favourites_resume.sql:** once the catalog started
+-- *selecting* poster/backdrop/duration/thumbnail/release_year, "not selected" was
+-- no longer an option, so 009 reconciles those columns with ADD COLUMN IF NOT
+-- EXISTS. The note above is kept as the historical record of the original rule.
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tavuno_movies_slug ON tavuno_movies(slug);

@@ -87,6 +87,35 @@ class FakeConnection:
     def fetchall(self):
         if "FROM tavuno_channel_sources" in self.query:
             return [{"provider": "dispatcharr", "external_id": "17", "priority": 1, "is_active": True}]
+        # A6: /v1/home reads the VOD tables too, and their query LEFT JOINs
+        # tavuno_categories — so these two branches must be tested *before* the
+        # categories one below, or every movie/series rail is answered with
+        # category rows and the mapper fails on a missing 'title'.
+        if "tavuno_movies" in self.query:
+            return [{
+                "id": 1,
+                "title": "Prime Movie",
+                "slug": "prime-movie",
+                "category": None,
+                "synopsis": "Action thriller",
+                "release_year": 2024,
+                "poster": None,
+                "is_active": True,
+                "created_at": None,
+                "category_name": None,
+            }]
+        if "tavuno_series" in self.query:
+            return [{
+                "id": 1,
+                "title": "Test Series",
+                "slug": "test-series",
+                "category": None,
+                "synopsis": "Test",
+                "poster": None,
+                "is_active": True,
+                "created_at": None,
+                "category_name": None,
+            }]
         if "tavuno_categories" in self.query:
             return [{"id": 1, "name": "M2 Demo Live", "kind": "live", "parent": None, "sort_order": 1000, "is_active": True}]
         if "tavuno_channels" in self.query:

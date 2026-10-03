@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     dispatcharr_sync_interval_seconds: int = Field(default=3600, validation_alias="DISPATCHARR_SYNC_INTERVAL_SECONDS")
     dispatcharr_timeout_seconds: float = Field(default=20.0, validation_alias="DISPATCHARR_TIMEOUT_SECONDS")
 
+    # Public Directus origin used to turn stored file UUIDs into fetchable asset
+    # URLs (see app/assets.py). This is the address *clients* can reach, not the
+    # compose-network one: on the emulator that is 10.0.2.2, in production it is
+    # whatever Caddy serves /directus/ on. Left blank, artwork references are
+    # returned untouched (placeholders) rather than rewritten to a path the
+    # device cannot resolve.
+    directus_url: str = Field(default="", validation_alias="DIRECTUS_PUBLIC_URL")
+
     session_reaper_interval_seconds: int = Field(default=60, validation_alias="SESSION_REAPER_INTERVAL_SECONDS")
 
     ome_api_url: str = Field(default="http://tavuno-ovenmediaengine:8081", validation_alias="OME_API_URL")

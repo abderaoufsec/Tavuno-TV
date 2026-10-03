@@ -50,6 +50,44 @@ def _int(value: Any) -> int | None:
         return None
 
 
+def _artwork(item: dict[str, Any], *keys: str) -> str | None:
+    """Pull an artwork reference out of a Dispatcharr payload.
+
+    The columns this writes (``tavuno_movies.poster`` and friends) hold a
+    Directus file UUID, and the read path turns that into an ``/assets/<uuid>``
+    URL (see :mod:`app.assets`). Dispatcharr is not consistent about how it
+    expresses artwork, so every plausible shape is accepted and anything
+    unrecognised is dropped rather than stored — a bogus string in a poster
+    column is worse than no poster, because it renders as a broken image instead
+    of a clean placeholder.
+
+    Accepted, in order of preference:
+      * ``{"id": "<uuid>"}``          - an expanded Directus file relation
+      * ``"<uuid>"``                 - a bare file id
+      * ``"https://..."`` / ``"/x"`` - an already-addressable path or URL
+    """
+    for key in keys:
+        raw = item.get(key)
+        if raw is None:
+            continue
+
+        # Expanded relation: Directus returns {"id": ..., "filename": ...}.
+        if isinstance(raw, dict):
+            raw = raw.get("id") or raw.get("uuid") or raw.get("filename_download")
+        text = _text(raw)
+        if not text:
+            continue
+
+        from .assets import asset_url  # local import: avoids a cycle at module load
+
+        resolved = asset_url(text, None)
+        # asset_url returns the input unchanged when it is not a UUID, which is
+        # exactly the "already a URL/path" case we want to keep.
+        if resolved:
+            return resolved
+    return None
+
+
 def _stream_dispatcharr_channel_ids(stream: dict[str, Any]) -> list[int]:
     ids: list[int] = []
     for key in ("channel", "channel_id"):
@@ -556,7 +594,11 @@ class SyncService:
             synopsis = movie.get("description") or movie.get("plot") or movie.get("synopsis")
             year = _int(movie.get("year") or movie.get("release_year"))
             category_id = self._vod_category_id(movie, category_map)
-            
+            # Artwork: stored as the raw reference (usually a Directus file UUID);
+            # the catalog read path turns it into a fetchable /assets/<uuid> URL.
+            poster = _artwork(movie, "poster", "poster_url", "poster_path", "image")
+            backdrop = _artwork(movie, "backdrop", "backdrop_url", "fanart", "background")
+
             # Fetch stream URL for this movie
             stream_url = None
             try:
@@ -572,18 +614,19 @@ class SyncService:
                 connection.execute(
                     """
                     UPDATE tavuno_movies
-                    SET title = %s, category = COALESCE(%s, category), synopsis = %s, release_year = %s, stream_url = %s, is_active = TRUE
+                    SET title = %s, category = COALESCE(%s, category), synopsis = %s, release_year = %s, stream_url = %s,
+                        poster = COALESCE(%s, poster), backdrop = COALESCE(%s, backdrop), is_active = TRUE
                     WHERE id = %s
                     """,
-                    (title, category_id, synopsis, year, stream_url, existing["id"]),
+                    (title, category_id, synopsis, year, stream_url, poster, backdrop, existing["id"]),
                 )
                 continue
             connection.execute(
                 """
-                INSERT INTO tavuno_movies (title, slug, category, synopsis, release_year, stream_url, is_active)
-                VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+                INSERT INTO tavuno_movies (title, slug, category, synopsis, release_year, poster, backdrop, stream_url, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
                 """,
-                (title, slug, category_id, synopsis, year, stream_url),
+                (title, slug, category_id, synopsis, year, poster, backdrop, stream_url),
             )
             synced += 1
         
@@ -625,23 +668,28 @@ class SyncService:
             slug = f"darr-series-{series_id}"
             synopsis = series.get("description") or series.get("plot") or series.get("synopsis")
             category_id = self._vod_category_id(series, category_map)
+            poster = _artwork(series, "poster", "poster_url", "poster_path", "image")
+            backdrop = _artwork(series, "backdrop", "backdrop_url", "fanart", "background")
+            release_year = _int(series.get("year") or series.get("release_year"))
             existing = connection.execute("SELECT id FROM tavuno_series WHERE slug = %s", (slug,)).fetchone()
             if existing:
                 connection.execute(
                     """
                     UPDATE tavuno_series
-                    SET title = %s, category = COALESCE(%s, category), synopsis = %s, is_active = TRUE
+                    SET title = %s, category = COALESCE(%s, category), synopsis = %s, is_active = TRUE,
+                        poster = COALESCE(%s, poster), backdrop = COALESCE(%s, backdrop),
+                        release_year = COALESCE(%s, release_year)
                     WHERE id = %s
                     """,
-                    (title, category_id, synopsis, existing["id"]),
+                    (title, category_id, synopsis, poster, backdrop, release_year, existing["id"]),
                 )
                 continue
             connection.execute(
                 """
-                INSERT INTO tavuno_series (title, slug, category, synopsis, is_active)
-                VALUES (%s, %s, %s, %s, TRUE)
+                INSERT INTO tavuno_series (title, slug, category, synopsis, poster, backdrop, release_year, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
                 """,
-                (title, slug, category_id, synopsis),
+                (title, slug, category_id, synopsis, poster, backdrop, release_year),
             )
             synced += 1
         
@@ -710,7 +758,8 @@ class SyncService:
                 (season_id, episode_number),
             ).fetchone()
             synopsis = episode.get("description") or episode.get("plot") or ""
-            
+            thumbnail = _artwork(episode, "thumbnail", "thumbnail_url", "still", "image")
+
             # Fetch stream URL for this episode
             episode_id = _int(episode.get("id"))
             stream_url = None
@@ -727,18 +776,19 @@ class SyncService:
                 connection.execute(
                     """
                     UPDATE tavuno_episodes
-                    SET title = %s, synopsis = %s, stream_url = %s, is_active = TRUE
+                    SET title = %s, synopsis = %s, stream_url = %s, is_active = TRUE,
+                        thumbnail = COALESCE(%s, thumbnail)
                     WHERE id = %s
                     """,
-                    (title, synopsis, stream_url, existing["id"]),
+                    (title, synopsis, stream_url, thumbnail, existing["id"]),
                 )
                 continue
             connection.execute(
                 """
-                INSERT INTO tavuno_episodes (season, episode_number, title, synopsis, stream_url, is_active)
-                VALUES (%s, %s, %s, %s, %s, TRUE)
+                INSERT INTO tavuno_episodes (season, episode_number, title, synopsis, thumbnail, stream_url, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE)
                 """,
-                (season_id, episode_number, title, synopsis, stream_url),
+                (season_id, episode_number, title, synopsis, thumbnail, stream_url),
             )
             synced += 1
         logger.info("VOD episodes sync: %d episodes processed", synced)
