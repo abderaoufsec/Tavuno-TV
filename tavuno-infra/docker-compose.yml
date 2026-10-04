@@ -67,7 +67,10 @@ services:
     restart: unless-stopped
 
     ports:
-      - "8055:8055"
+      # Loopback-only on purpose: Directus's admin console must not be reachable from the LAN.
+      # Everything on the same host still reaches it via 127.0.0.1, and other containers reach
+      # it over the docker network as `directus:8055`, which host binding does not affect.
+      - "127.0.0.1:8055:8055"
 
     depends_on:
       postgres:
@@ -107,7 +110,10 @@ services:
     restart: unless-stopped
 
     ports:
-      - "9191:9191"
+      # Loopback-only on purpose: Dispatcharr's admin surface would otherwise bypass Caddy's
+      # TLS redirect and be reachable by anyone on the same network. 127.0.0.1 publishing keeps
+      # the host browser working while closing it to the LAN; containers use `dispatcharr:9191`.
+      - "127.0.0.1:9191:9191"
 
     depends_on:
       postgres:
