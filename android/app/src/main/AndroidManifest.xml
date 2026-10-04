@@ -12,9 +12,15 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
+    <!--
+        allowBackup is off. The auth tokens live in DataStore, so with it on the token cache is
+        eligible for extraction through an ADB backup or a device-to-device transfer. Nothing
+        depends on restored state either: the shell rebuilds as a guest when no token is present,
+        so there is no cost to turning this off.
+    -->
     <application
         android:name=".TavunoApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
