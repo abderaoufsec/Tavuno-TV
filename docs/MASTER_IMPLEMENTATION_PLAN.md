@@ -183,6 +183,34 @@ Priority: **P1** = release/security/correctness; **P2** = quality/completeness.
 | F-17 | P2 | **Narrowed.** Auto-migration is already gated by `TAVUNO_AUTO_MIGRATE` with rollback via the connection context manager. Remaining: production default of that flag + a documented rollback path. | `app/main.py:45` |
 | F-18 | **P1** | **New, found while fixing F-3.** Playback URLs are issued from `OME_PLAYBACK_BASE_URL`, which defaults to `http://localhost:8080/media` — cleartext **and** a host no remote client can resolve. `PlaybackUrls.rewriteLoopbackForEmulator` patches the host to `10.0.2.2` for the emulator but leaves the scheme HTTP, so this only ever worked in local development. With F-3 now refusing cleartext, a release build cannot play until the base URL is HTTPS and publicly resolvable (Caddy in front of OME). | `app/config.py:76`, `tavuno-infra/docker-compose.yml:431`, `tavuno-infra/.env.example:33`, `android/.../playback/PlaybackUrls.kt` |
 | F-19 | **P1** | **New, found while verifying F-4.** `POST /v1/devices/register` returned **500** on every call: its INSERT omitted `device_key`, which the schema defines `NOT NULL` with a global `UNIQUE` constraint. The column arrives from the Directus base schema applied by `apply-m2-schema.ps1`, not from `tavuno-control/migrations`, so no migration in this repo pins it and the mismatch was never caught. The fingerprint is already globally unique, so the INSERT now writes it as `device_key` too. | `app/devices/service.py:75`, `psycopg.errors.NotNullViolation` in `tavuno-control` logs |
+| | F-20 | **P1** | **New, found while building F-6.** A freshly initialised database can never boot `tavuno-control`. `db_migrations.py` says so itself — *"The set patches a schema that already exists; it does not bootstrap one"* — and every migration only `ALTER`s the 16 `tavuno_*` collections, which are created by Directus through `tavuno-infra/scripts/apply-m2-schema.ps1`. That script is manual: nothing in `docker-compose.yml` runs it, and `tavuno-control` does not even `depends_on` `directus`. Against an empty Postgres the app crash-loops with `relation "tavuno_profiles" does not exist`. Invisible locally because the schema had been applied long ago — the same blind spot as F-19. CI now performs the documented bootstrap. | `tavuno-control/app/db_migrations.py:24`, no `depends_on: directus` in `docker-compose.yml`, `psycopg.errors.UndefinedTable` in CI run `37210061979` |
+| | F-21 | **P1** | **New, found while building F-6, one level deeper than F-20.** Even with the bootstrap applied, migration `004` still failed: `column "name" of relation "tavuno_plans" does not exist`. `apply-m2-schema.ps1` declared `code`, `description`, `max_devices`, `max_concurrent_streams` and `is_active` for `tavuno_plans` but never `name`, which `004` inserts into. The deployed database had the column only because it was added by hand through the Directus UI, so **the documented bootstrap did not reproduce the deployed schema** — the local database had drifted from its own setup script. `code` was already declared unique, so the migration's `ON CONFLICT (code)` was never at risk. Fixed by declaring `name` with the live column's exact shape (varchar(120), unique, not null); the collection's own display template was already `{{name}}`. | `psycopg.errors.UndefinedColumn` in CI run `37212193390`, `tavuno-infra/scripts/apply-m2-schema.ps1:83` |
+
+### F-6 result — CI, and the two defects it exposed
+
+`.github/workflows/ci.yml`, three jobs, triggered by pushes to `main`, pull requests and a weekly
+schedule:
+
+| Job | Does | Result |
+| --- | --- | --- |
+| `backend` | copies `.env.example`, generates the 12 secrets compose now requires (`${VAR:?...}`, F-2), boots the stack, applies the Directus base schema (F-20), waits on `/health`, provisions the integration account, runs the suite | **490 passed, 13 skipped** — identical to local |
+| `android` | JDK 17 (Gradle 8.2, `jvmTarget 17`), `:app:testDebugUnitTest :app:assembleDebug`, uploads the debug APK and the unit-test XML | green |
+| `android-instrumented` | schedule and `workflow_dispatch` only (it boots an emulator): KVM enabled, API 34, `connectedDebugAndroidTest` for `DPadNavigationTest` / `DvrRewindTest` | skipped on push |
+
+Four traps, each found by a red run rather than by reading the code:
+
+- `android/gradlew` was tracked `100644`, so `./gradlew` would have died with *Permission denied* on a
+  Linux runner. It already carried the `#!/bin/sh` shebang and is now `100755`.
+- Directus 12 answers **403** on `/server/health` for unauthenticated callers, which made a `curl -f`
+  loop time out against a perfectly healthy container. `/server/ping` is the public probe.
+- `psql` does **not** interpolate `:'var'` inside `-c`; it fails with `syntax error at or near ":"`.
+- `tavuno_profiles.directus_user` is a foreign key onto `directus_users`, so the seeded profile must
+  leave it NULL, and login additionally demands an active subscription before it will register a
+  device.
+
+The suite runs with `-rs`. That is not decoration: without skip reasons the three EPG tests that
+skipped *only* in CI (487/16 versus 490/13 locally) were indistinguishable from tests that had passed.
+CI and local now agree on the exact 13.
 
 ### F-14 correction (action differs from the audit)
 
