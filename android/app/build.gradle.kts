@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -22,6 +25,28 @@ android {
         buildConfigField("String", "TAVUNO_API_BASE_URL", "\"${project.findProperty("TAVUNO_API_BASE_URL") ?: "http://10.0.2.2:8000"}\"")
     }
 
+    // Release signing. The keystore and its passwords live in android/keystore.properties,
+    // which is gitignored. When that file is absent — a fresh clone, or CI without secrets —
+    // the release type simply stays unsigned instead of failing the build, so `assembleRelease`
+    // still runs everywhere and R8 still gets exercised.
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    val keystoreProperties = Properties().apply {
+        if (keystorePropertiesFile.exists()) {
+            FileInputStream(keystorePropertiesFile).use { load(it) }
+        }
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -29,6 +54,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isDebuggable = true

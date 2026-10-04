@@ -49,5 +49,11 @@ temp/
 # Audit / emulator capture artifacts (screenshots taken during verification runs)
 .shots/
 
+# Secrets / local machine config
+android/keystore.properties
+*.jks
+*.keystore
+!debug.keystore
+
 # Backups
 tavuno-infra/backups/
