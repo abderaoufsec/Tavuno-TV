@@ -69,14 +69,26 @@ class DeviceService:
                 )
                 device_id = existing['id']
             else:
-                # Create new device
+                # Create new device.
+                #
+                # device_key is NOT NULL with a global UNIQUE constraint
+                # (tavuno_devices_device_key_unique) and arrives from the Directus
+                # base schema rather than from tavuno-control's own migrations.
+                # This INSERT used to omit it, so every register call failed with
+                # NotNullViolation (F-19). The fingerprint is already globally
+                # unique (tavuno_devices_device_fingerprint_key), so reusing it
+                # satisfies both constraints without inventing another identifier.
+                key = (device_fingerprint or "").strip()
+                if not key:
+                    raise ValueError("device_fingerprint is required")
                 result = conn.execute(
                     """
-                    INSERT INTO tavuno_devices (profile, name, device_fingerprint, platform, is_active, last_seen_at)
-                    VALUES (%s, %s, %s, %s, TRUE, NOW())
+                    INSERT INTO tavuno_devices
+                        (profile, name, device_key, device_fingerprint, platform, is_active, last_seen_at)
+                    VALUES (%s, %s, %s, %s, %s, TRUE, NOW())
                     RETURNING id, name, platform, last_seen_at, revoked_at
                     """,
-                    (profile_id, name, device_fingerprint, platform),
+                    (profile_id, name, key, key, platform),
                 ).fetchone()
                 device_id = result['id']
             
