@@ -140,7 +140,11 @@ jobs:
 
       - name: Run the backend suite
         working-directory: tavuno-control
-        run: python -m pytest tests -q
+        # -rs prints the skip reason for each skip: the suite legitimately
+        # skips a handful (M7/M9 auth, live-DB migrations, session limits),
+        # and without reasons a CI-only skip is indistinguishable from a test
+        # silently dropping out of the gate.
+        run: python -m pytest tests -q -rs
 
       - name: Stack logs
         if: failure()
