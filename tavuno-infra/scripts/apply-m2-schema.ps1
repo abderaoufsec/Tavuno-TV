@@ -80,6 +80,7 @@ Ensure-Field 'tavuno_devices' 'platform' 'string' (String-Schema 48 $false $fals
 Ensure-Field 'tavuno_devices' 'is_active' 'boolean' (Boolean-Schema $true) $true 'Whether this device may start playback.'
 Ensure-Field 'tavuno_devices' 'last_seen_at' 'timestamp' (DateTime-Schema $true) $false 'Last authenticated activity.'
 
+Ensure-Field 'tavuno_plans' 'name' 'string' (String-Schema 120 $true $false) $true 'Human-readable plan name. Required by migration 004_m8_free_plan.'
 Ensure-Field 'tavuno_plans' 'code' 'string' (String-Schema 64 $true $false) $true 'Stable internal plan code.'
 Ensure-Field 'tavuno_plans' 'description' 'text' (Text-Schema $true) $false 'Operator-facing plan description.'
 Ensure-Field 'tavuno_plans' 'max_devices' 'integer' (Integer-Schema $false) $true 'Maximum registered devices.'
