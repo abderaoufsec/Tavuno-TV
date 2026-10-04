@@ -138,6 +138,49 @@ jobs:
           docker compose -f tavuno-infra/docker-compose.yml logs --tail 300
           exit 1
 
+      - name: Provision the integration test account
+        env:
+          TEST_EMAIL: m9test@tavunotv.local
+          TEST_PASSWORD: test123
+        run: |
+          set -euo pipefail
+          # The auth_headers fixture in tests/test_integration.py logs in as
+          # this account. It only ever exists by hand in the local lab, so a
+          # fresh environment had no row for it and three EPG tests skipped
+          # with "integration login failed: HTTP 401" while the rest passed.
+          # app/auth/service.py checks tavuno_profiles.email/password_hash
+          # directly with bcrypt - no Directus round-trip - so one seeded row
+          # is enough. Values mirror the lab account: role=admin, active.
+          hash="$(python -c "import bcrypt,sys; print(bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt()).decode())" "$TEST_PASSWORD")"
+
+          # Two details this step depends on, both verified against the live
+          # database rather than assumed:
+          #  * directus_user stays NULL. It is a foreign key onto directus_users
+          #    (a random uuid is rejected), and 005_m11 made it nullable so that
+          #    self-registration works without a Directus account.
+          #  * the subscription is mandatory. Login registers a new device only
+          #    for a profile with an active subscription, otherwise it answers
+          #    402 subscription_required. Migration 004 always inserts the
+          #    free_launch plan, so it is a stable target on a fresh database.
+          #
+          # Values are expanded by the shell, not by psql: psql does not
+          # interpolate :'var' inside -c. That is safe because bcrypt's alphabet
+          # is ./A-Za-z0-9, so the hash can never contain a quote that would
+          # break the SQL literal, and bash does not re-expand "$hash".
+          docker compose -f tavuno-infra/docker-compose.yml exec -T postgres \
+            psql -U tavuno -d tavuno -v ON_ERROR_STOP=1 \
+            -c "INSERT INTO tavuno_profiles
+                  (directus_user, display_name, status, email, password_hash, role, is_kids)
+                VALUES
+                  (NULL, 'M9 Test User', 'active', '$TEST_EMAIL', '$hash', 'admin', FALSE)
+                ON CONFLICT (email) DO NOTHING;
+                INSERT INTO tavuno_subscriptions (profile, plan, status, starts_at)
+                SELECT p.id, pl.id, 'active', NOW()
+                FROM tavuno_profiles p, tavuno_plans pl
+                WHERE p.email = '$TEST_EMAIL' AND pl.code = 'free_launch'
+                  AND NOT EXISTS (SELECT 1 FROM tavuno_subscriptions s WHERE s.profile = p.id);"
+          echo "Integration test account ready"
+
       - name: Run the backend suite
         working-directory: tavuno-control
         # -rs prints the skip reason for each skip: the suite legitimately
