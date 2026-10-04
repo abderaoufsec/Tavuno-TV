@@ -433,12 +433,12 @@ services:
       # is the emulator's host alias locally and the real origin in production.
       DIRECTUS_PUBLIC_URL: ${DIRECTUS_PUBLIC_URL:-}
       OME_API_URL: http://tavuno-ovenmediaengine:8081
-      OME_API_TOKEN: ${OME_API_TOKEN:-tavuno-m1-local}
+      OME_API_TOKEN: "${OME_API_TOKEN:?generate a unique value; the published default is forgeable}"
       OME_PLAYBACK_BASE_URL: ${OME_PLAYBACK_BASE_URL:-http://localhost:8080/media}
       PLAYBACK_PUBLIC_HOST: ${PLAYBACK_PUBLIC_HOST:-}
-      PLAYBACK_TOKEN_SECRET: ${PLAYBACK_TOKEN_SECRET:-tavuno-playback-secret-key}
+      PLAYBACK_TOKEN_SECRET: "${PLAYBACK_TOKEN_SECRET:?generate a unique value; the published default is forgeable}"
       PLAYBACK_TOKEN_TTL_SECONDS: ${PLAYBACK_TOKEN_TTL_SECONDS:-120}
-      JWT_SECRET: ${JWT_SECRET:-tavuno-jwt-secret-key-change-in-production}
+      JWT_SECRET: "${JWT_SECRET:?generate a unique value; the published default is forgeable}"
       JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
       JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-2592000}
       PASSWORD_HASH_SCHEME: ${PASSWORD_HASH_SCHEME:-bcrypt}
@@ -446,7 +446,7 @@ services:
       # catalog/playback. Set AUTH_OPEN_ACCESS=false to re-enable auth.
       AUTH_OPEN_ACCESS: ${AUTH_OPEN_ACCESS:-true}
       AUTH_GUEST_EMAIL: ${AUTH_GUEST_EMAIL:-guest@tavuno.local}
-      AUTH_GUEST_DEVICE_KEY: ${AUTH_GUEST_DEVICE_KEY:-tavuno-tv-guest}
+      AUTH_GUEST_DEVICE_KEY: "${AUTH_GUEST_DEVICE_KEY:?generate a unique value; the published default is guessable}"
       # Live-channel test scope: restrict /v1/channels and /v1/home to a small
       # set of verified-working channels while testing. An empty allowlist plus
       # limit 0 exposes the full synced catalog (production).
@@ -465,7 +465,7 @@ services:
       # a token rather than require_admin because free-launch mode gives the
       # guest role `user`, which would make every admin route 403. Override in
       # production.
-      TAVUNO_OPS_TOKEN: ${TAVUNO_OPS_TOKEN:-tavuno-ops-local}
+      TAVUNO_OPS_TOKEN: "${TAVUNO_OPS_TOKEN:?generate a unique value; the published default grants ops access}"
 
     healthcheck:
       test:

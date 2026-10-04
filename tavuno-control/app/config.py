@@ -9,15 +9,45 @@ logger = logging.getLogger("tavuno-control.config")
 # Each is a published constant, so its value outside development is a real
 # exposure rather than a cosmetic one. Checked at startup so an operator finds
 # out from the log rather than from an incident.
+#
+# These five are exactly the compose fallbacks listed in
+# docs/MASTER_IMPLEMENTATION_PLAN.md §F-2; milestones.md says "four", it is five.
 _INSECURE_DEFAULT_SECRETS: dict[str, str] = {
     "jwt_secret": "tavuno-jwt-secret-key-change-in-production",
     "playback_token_secret": "tavuno-playback-secret-key",
     "ops_token": "tavuno-ops-local",
     "ome_api_token": "tavuno-m1-local",
+    "auth_guest_device_key": "tavuno-tv-guest",
 }
 
 # Environments where the defaults are expected and correct.
 _DEV_ENVIRONMENTS = {"development", "dev", "local", "test"}
+
+# Environments where a published default is an incident, not a smell.
+_PRODUCTION_ENVIRONMENTS = {"production", "prod"}
+
+
+def _is_published_default(value: object, published: str) -> bool:
+    """True when `value` is the published constant, including a decorated copy.
+
+    The deployed .env carries JWT_SECRET as the default with a reassuring suffix
+    appended ("...change-in-production-use-random-64-hex-in-production", 74 chars
+    against the 42-char constant). An equality check misses that entirely while
+    the value is still readable out of the repository, so match the prefix too.
+    """
+    if not isinstance(value, str):
+        return False
+    return value == published or value.startswith(published)
+
+
+def _is_placeholder(value: object) -> bool:
+    """True for the CHANGE_ME placeholders .env.example ships.
+
+    An operator who copies the example and forgets to fill one in would
+    otherwise deploy a secret that anyone who has read the repository can
+    guess, which is the same failure the published constants cause.
+    """
+    return isinstance(value, str) and value.strip().upper().startswith("CHANGE_ME")
 
 
 class Settings(BaseSettings):
@@ -125,24 +155,49 @@ class Settings(BaseSettings):
     ops_token: str = Field(default="tavuno-ops-local", validation_alias="TAVUNO_OPS_TOKEN")
 
     @model_validator(mode="after")
-    def _warn_on_default_secrets(self) -> "Settings":
-        """Warn loudly when a published default secret is live outside development.
+    def _check_default_secrets(self) -> "Settings":
+        """Handle published default secrets, tiered by environment.
 
-        Deliberately a warning, not an error: refusing to start would turn a
-        configuration smell into an outage, and the stack has to be able to
-        come up for an operator to read the log that tells them what to fix.
+        - ``_DEV_ENVIRONMENTS``: silent. A fresh clone has to run with no setup,
+          and warning there would train people to ignore the message that matters.
+        - any other non-production environment: warn, but still construct. An
+          operator must be able to boot and read the log that explains what to
+          fix; turning a configuration smell into an outage hides exactly that.
+        - ``_PRODUCTION_ENVIRONMENTS``: refuse. This is the point of the check.
+          With a published default live, anyone who has read the repository can
+          mint valid JWTs, playback tokens, guest identity and ops access on the
+          deployed instance, so starting would be the worse failure mode.
         """
-        if (self.environment or "").strip().lower() in _DEV_ENVIRONMENTS:
+        environment = (self.environment or "").strip().lower()
+        if environment in _DEV_ENVIRONMENTS:
             return self
-        for field_name, default in _INSECURE_DEFAULT_SECRETS.items():
-            if getattr(self, field_name, None) == default:
-                logger.warning(
-                    "SECURITY: %s is still the built-in default in a non-development "
-                    "environment (%s). Set it from the environment before exposing this "
-                    "service.",
-                    field_name.upper(),
-                    self.environment,
-                )
+
+        offenders = [
+            field_name
+            for field_name, published in _INSECURE_DEFAULT_SECRETS.items()
+            if _is_published_default(getattr(self, field_name, None), published)
+            or _is_placeholder(getattr(self, field_name, None))
+        ]
+        if not offenders:
+            return self
+
+        names = ", ".join(name.upper() for name in offenders)
+        if environment in _PRODUCTION_ENVIRONMENTS:
+            raise ValueError(
+                f"Refusing to start: {names} are still the published defaults "
+                f"while TAVUNO_ENV={self.environment}. Generate one random value "
+                "per secret before deploying, e.g. "
+                "`python -c \"import secrets;print(secrets.token_hex(32))\"`."
+            )
+
+        for field_name in offenders:
+            logger.warning(
+                "SECURITY: %s is still the built-in default in a non-development "
+                "environment (%s). Set it from the environment before exposing this "
+                "service.",
+                field_name.upper(),
+                self.environment,
+            )
         return self
 
     @property
