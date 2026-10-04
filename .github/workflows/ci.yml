@@ -72,6 +72,39 @@ jobs:
         working-directory: tavuno-infra
         run: docker compose up -d --build
 
+      - name: Bootstrap the Directus base schema
+        run: |
+          set -uo pipefail
+          # The 16 Tavuno collections (tavuno_profiles, tavuno_devices,
+          # tavuno_channels, ...) are created by Directus, NOT by
+          # tavuno-control/migrations - see docs/M2_Data_Foundation.md,
+          # "Reproducibility". On a fresh database the API therefore
+          # crash-loops with `relation "tavuno_profiles" does not exist`
+          # until this idempotent script has run once.
+          echo "Waiting for Directus..."
+          healthy=0
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8055/server/health > /dev/null 2>&1; then
+              echo "Directus healthy after ${attempt} attempt(s)"
+              healthy=1
+              break
+            fi
+            sleep 5
+          done
+          if [ "$healthy" -ne 1 ]; then
+            echo "::error::Directus never became healthy"
+            docker compose -f tavuno-infra/docker-compose.yml logs --tail 200
+            exit 1
+          fi
+
+          pwsh tavuno-infra/scripts/apply-m2-schema.ps1
+          echo "Base schema applied"
+
+          # tavuno-control gave up while the collections were missing.
+          # `restart: unless-stopped` keeps retrying, but restart explicitly so
+          # the migrations run against a schema that now exists.
+          docker compose -f tavuno-infra/docker-compose.yml restart tavuno-control
+
       - name: Wait for the API
         run: |
           set -uo pipefail
