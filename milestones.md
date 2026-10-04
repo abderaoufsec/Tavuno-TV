@@ -247,6 +247,50 @@ player-adjacent code was re-targeted to Media3/ExoPlayer rather than copied verb
      resolved to `Ignore` instead of `FocusHud`, and the unconsumed key pair leaked into the strip
      (same visible pop). Moving the modifier in front of `focusable` restores the real signal.
 
+### Production Readiness — Phase 0/1: Master Plan & Gap Matrix ✅ COMPLETE (2026-10-04)
+- **Recovery point first.** Annotated tag `pre-master-implementation` → `06108fb`, so the last
+  known-good A4/A5/A6 state survives whatever the coming phases do to the tree.
+- **`docs/MASTER_IMPLEMENTATION_PLAN.md`** is now the single source of truth: settled scope
+  decisions, architecture and the authority split, the four baselines that must not regress,
+  the reuse matrix, all seventeen findings, a thirteen-phase roadmap with what verifies each
+  phase, the risks, and the commit policy.
+- **`docs/OWNTV_TAVUNO_GAP_MATRIX.md`** is the detailed per-surface view behind that plan:
+  every Tavuno screen and subsystem against its OwnTV reference, with the gap, the action and
+  the test that must pin it when the row closes.
+- **Scope settled by decision.** `android/` stays the client; OwnTV-Baseline is a read-only
+  reference and is not a dependency, a submodule or a sibling repo. No `android` remote, no
+  repository split — the earlier "push android separately" idea is withdrawn.
+- **Measured, not assumed.** OwnTV app is **202** Kotlin files (the 614 figure counted
+  OwnTV_Core as well), 20 feature packages, 46 UI components, 11 theme files. Tavuno's client
+  is 71 files and ported **5 components plus one rename** — the design-system port was
+  deliberately minimal, so "Tavuno is missing OwnTV's UI" overstates it: roughly 25-35
+  reference files are actually wanted, and the rest is libmpv/Room platform code that is out
+  of scope by decision (multiview, downloads, DVR recording, TMDB authoring, i18n, Stalker,
+  companion server, backup/restore, self-update).
+- **Three audit findings corrected against the tree, one of them upgraded:**
+  1. **F-2 is not "default secrets in `.env`"** — both `.env` files hold real values with zero
+     `CHANGE_ME`. The defect is the **compose layer**: five `${VAR:-literal}` fallbacks in
+     `docker-compose.yml` (`JWT_SECRET`, `PLAYBACK_TOKEN_SECRET`, `TAVUNO_OPS_TOKEN`,
+     `OME_API_TOKEN`, `AUTH_GUEST_DEVICE_KEY`). A deployment that forgets `JWT_SECRET` silently
+     receives `tavuno-jwt-secret-key-change-in-production`, a value published in this repo, so
+     tokens become forgeable. Raised P2 → **P1**. `milestones.md` said "four default secrets";
+     there are five.
+  2. **F-17 is narrower than stated** — auto-migration is already gated by `TAVUNO_AUTO_MIGRATE`
+     and rolls back through the connection context manager. What remains is the production
+     default of that flag and a documented rollback path.
+  3. **F-14's remedy was half wrong — and so was my first correction of it.** The audit implied
+     `docs/images/` was in use; a repo-wide `git grep` shows nothing references `app-icon.jpg` or
+     `app-background.jpg`, and the client ships only vector launcher resources. They are now
+     committed so they cannot be lost, but they stay unreferenced and that is recorded rather
+     than papered over. Only `.shots/` belongs in `.gitignore` (now line 50).
+- **The architectural fact that governs every port:** OwnTV is local-first (Room) and Tavuno is
+  server-authoritative (HTTP + Postgres). Ported code must be re-targeted to
+  `TavunoApiService`/repositories; no Room dependency will be added.
+- **Tavuno's real gap is not missing OwnTV code** — it is the absence of client UI for APIs
+  that already exist (F-5: favourites, resume, home rails), plus release hardening (F-1, F-3,
+  F-8).
+
+
 ### Phase 1 — Reproducibility: Schema Migration Runner ✅ COMPLETE (2026-10-02)
 - **The gap:** `tavuno-control/migrations/` held eight hand-written SQL files and there was no
   runner anywhere in the repository — a fresh clone had no supported path to a working schema, and
